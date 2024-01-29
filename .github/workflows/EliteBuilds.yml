@@ -14,6 +14,7 @@ on:
 
 # Environment Variables
 env:
+  auth: ${{ secrets.AUTH }}
   USER_NAME: ${{ secrets.USER_NAME }}
   EMAIL: ${{ secrets.EMAIL }}
   REPO: ${{ github.event.repository.name }}
