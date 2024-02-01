@@ -1,0 +1,57 @@
+name: Apk Updates
+
+on:
+  workflow_dispatch:
+
+env:
+  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+  REPOSITORY: ${{ secrets.REPOSITORY }}
+  USER_NAME: ${{ secrets.USER_NAME }}
+  EMAIL: ${{ secrets.EMAIL }}
+  SOURCE: ${{ secrets.SOURCE }}
+  SF_PWD: ${{ secrets.SF_PWD }}
+  RELEASE_TYPE: 'stable'
+  ENVIRONMENT_TYPE: ${{ secrets.ENVIRONMENT_TYPE }}
+  PACKAGE_LIST: core,basic,omni,stock,full,go,addonsets,addons,debloater
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+       - name: Checkout
+         uses: actions/checkout@main
+
+       - name: Setup SSH Keys and known_hosts 
+         uses: webfactory/ssh-agent@v0.4.1
+         with:
+             ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+             
+       - name: Setup SSH Keys and known_hosts using kielabokkie
+         uses: kielabokkie/ssh-key-and-known-hosts-action@v1
+         with:
+           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+           ssh-host: gitlab.com
+            
+       - name: Initialization and Fetching the Source Code
+         run: |
+            git config --global user.name "$USER_NAME"
+            git config --global user.email "$EMAIL"
+            
+       - name: Update Git configs
+         run: |
+           git config --global http.postBuffer 157286400
+           git clone --depth=1 git@github.com:nikgapps/updater.git
+
+       - name: Installing Requirements
+         run: |
+            python3 -m pip install wheel setuptools testresources lxml
+            cd updater
+            pip3 install -r requirements.txt
+            cd ..
+            
+       - name: Run ApkMirror
+         run: |
+            cd updater
+            python3 apkmirrorupdates.py
+            cd ..
