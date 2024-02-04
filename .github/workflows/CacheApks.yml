@@ -50,7 +50,7 @@ jobs:
            python3 -m pip install NikGapps
            mkdir NikGappsProject
 
-       - name: Installing Requirements
+       - name: Caching Apks
          run: |
            cd NikGappsProject
            cache --androidVersion ${{ github.event.inputs.android_versions }}
