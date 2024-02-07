@@ -24,7 +24,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        android_version: ${{ github.event.inputs.android_versions }}
+        android_version: ${{ fromJson(github.event.inputs.android_versions) }}
     steps:
        - name: Checkout
          uses: actions/checkout@main
