@@ -54,6 +54,11 @@ jobs:
             ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
             ssh-host: frs.sourceforge.net
            
+      - name: Add gitlab.com to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
+
       - name: Environment Details and clean up
         run: |
           rm -rf Build 10 11 12 Releases canary-release release nikgapps.github.io TempPackages
