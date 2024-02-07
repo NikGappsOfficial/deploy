@@ -22,7 +22,9 @@ env:
 jobs:
   build:
     runs-on: macos-latest
-
+    strategy:
+      matrix:
+        android_version: ${{ github.event.inputs.android_versions }}
     steps:
        - name: Checkout
          uses: actions/checkout@main
@@ -49,8 +51,8 @@ jobs:
           python3 -m pip install NikGapps
           mkdir NikGappsProject
 
-       - name: Caching Apks
+       - name: Caching Apks for Android ${{ matrix.android_version }}
          run: |
           cd NikGappsProject
-          cache --androidVersion ${{ github.event.inputs.android_versions }}
+          cache --androidVersion ${{ matrix.android_version }}
           cd ..
