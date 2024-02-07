@@ -75,7 +75,7 @@ jobs:
       - name: Building User Builds
         run: |
           cd ondemand
-          python3 main.py -A 10,11,12,12.1,13,14 -U
+          python3 main.py -A 10,11,12,12.1,13,14 -U -c
           cd ..
      
       - name: Updating download count

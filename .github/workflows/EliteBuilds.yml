@@ -75,13 +75,13 @@ jobs:
       - name: Building Android 13 Elite Builds
         run: |
           cd ondemand
-          python3 main.py -A 13 -U -e 1
+          python3 main.py -A 13 -U -e 1 -c
           cd ..
 
       - name: Building Android 14 Elite Builds
         run: |
           cd ondemand
-          python3 main.py -A 14 -U -e 1
+          python3 main.py -A 14 -U -e 1 -c
           cd ..
         
       - name: Updating download count
