@@ -43,11 +43,10 @@ jobs:
         with:
             ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
       
-      - name: Setup SSH Keys and known_hosts using kielabokkie
-        uses: kielabokkie/ssh-key-and-known-hosts-action@v1
-        with:
-            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-            ssh-host: frs.sourceforge.net
+      - name: Add multiple hosts to known_hosts
+        run: |
+          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts 
            
       - name: Environment Details and clean up
         run: |
@@ -61,23 +60,23 @@ jobs:
       
       - name: Initialization and Fetching the Source Code
         run: |
-           git config --global user.name "$USER_NAME"
-           git config --global user.email "$EMAIL"
-           git config --global http.postBuffer 1048576000
-           git clone --depth=1 git@github.com:nikgapps/ondemand.git
+          git config --global user.name "$USER_NAME"
+          git config --global user.email "$EMAIL"
+          git config --global http.postBuffer 1048576000
+          git clone --depth=1 git@github.com:nikgapps/ondemand.git
            
       - name: Installing Requirements
         run: |
-           python3 -m pip install wheel setuptools testresources
-           cd ondemand
-           pip3 install -r requirements.txt
-           cd ..
+          python3 -m pip install wheel setuptools testresources
+          cd ondemand
+          pip3 install -r requirements.txt
+          cd ..
 
       - name: Building Android 13 Elite Builds
         run: |
-           cd ondemand
-           python3 main.py -A 13 -U -e 1
-           cd ..
+          cd ondemand
+          python3 main.py -A 13 -U -e 1
+          cd ..
 
       - name: Building Android 14 Elite Builds
         run: |
@@ -87,6 +86,6 @@ jobs:
         
       - name: Updating download count
         run: |
-           cd ondemand
-           python3 analytics_control.py
-           cd ..
+          cd ondemand
+          python3 analytics_control.py
+          cd ..

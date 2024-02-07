@@ -30,28 +30,27 @@ jobs:
        - name: Setup SSH Keys and known_hosts 
          uses: webfactory/ssh-agent@v0.4.1
          with:
-             ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+             ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}       
              
-       - name: Setup SSH Keys and known_hosts using kielabokkie
-         uses: kielabokkie/ssh-key-and-known-hosts-action@v1
-         with:
-           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-           ssh-host: gitlab.com
+       - name: Add multiple hosts to known_hosts
+         run: |
+          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
             
        - name: Initialization and Fetching the Source Code
          run: |
-            git config --global user.name "$USER_NAME"
-            git config --global user.email "$EMAIL"
+          git config --global user.name "$USER_NAME"
+          git config --global user.email "$EMAIL"
             
        - name: Update Git configs
          run: |
-           git config --global http.postBuffer 157286400
-           python3 -m pip install wheel setuptools testresources
-           python3 -m pip install NikGapps
-           mkdir NikGappsProject
+          git config --global http.postBuffer 157286400
+          python3 -m pip install wheel setuptools testresources
+          python3 -m pip install NikGapps
+          mkdir NikGappsProject
 
        - name: Caching Apks
          run: |
-           cd NikGappsProject
-           cache --androidVersion ${{ github.event.inputs.android_versions }}
-           cd ..
+          cd NikGappsProject
+          cache --androidVersion ${{ github.event.inputs.android_versions }}
+          cd ..
