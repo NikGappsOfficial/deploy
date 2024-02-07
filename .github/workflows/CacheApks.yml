@@ -6,7 +6,7 @@ on:
       android_versions:
         description: 'Comma-separated list of Android versions'
         required: false
-        default: '10,11,12,12.1,13,14'
+        default: '["10","11","12","12.1","13","14"]'
 
 env:
   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
