@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@main
+        uses: actions/checkout@v4
 
       - name: Setup SSH Keys and known_hosts 
         uses: webfactory/ssh-agent@v0.9.0
@@ -64,11 +64,7 @@ jobs:
 
     - name: Run steps in batch ${{ matrix.batch }}
       run: |
-        start=${{ matrix.batch.start }}
-        end=${{ matrix.batch.end }}
+        echo "START=${{ matrix.batch.start }}" >> $GITHUB_ENV
+        echo "END=${{ matrix.batch.end }}" >> $GITHUB_ENV
         
-        # Run the specific subset of steps based on the batch range
-        for i in $(seq $start $end); do
-          echo "Running step for item $i"
-          # Add your step execution logic here
-        done
+        python3 apkmirrorbatch.py
