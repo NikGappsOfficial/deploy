@@ -20,10 +20,10 @@ jobs:
         with:
             ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
             
-      - name: Add multiple hosts to known_hosts
+      - name: Add hosts to known_hosts if missing
         run: |
-          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
-          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
+          if ! grep -q "^frs\.sourceforge\.net " ~/.ssh/known_hosts; then ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts; fi
+          if ! grep -q "^gitlab\.com " ~/.ssh/known_hosts; then ssh-keyscan gitlab.com >> ~/.ssh/known_hosts; fi
           
       - name: Initialization and Fetching the Source Code
         run: |
@@ -49,6 +49,18 @@ jobs:
           python3 generate_batches.py > batches.json
           echo "::set-output name=batch_matrix::$(cat batches.json)"
 
+  # Cleanup known_hosts file after execution
+  cleanup_generate_batches:
+    name: Cleanup Generate Batches
+    runs-on: ubuntu-latest
+    needs: [generate_batches]
+
+    steps:
+      - name: Cleanup known_hosts file
+        run: |
+          sed -i '/^frs\.sourceforge\.net /d' ~/.ssh/known_hosts
+          sed -i '/^gitlab\.com /d' ~/.ssh/known_hosts
+
   execute_batches:
     name: Execute Batches
     runs-on: ubuntu-latest
@@ -59,41 +71,53 @@ jobs:
         batch: ${{fromJson(needs.generate_batches.outputs.batch_matrix)}}
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Setup SSH Keys and known_hosts 
-      uses: webfactory/ssh-agent@v0.4.1
-      with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Setup SSH Keys and known_hosts 
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+            
+      - name: Add hosts to known_hosts if missing
+        run: |
+          if ! grep -q "^frs\.sourceforge\.net " ~/.ssh/known_hosts; then ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts; fi
+          if ! grep -q "^gitlab\.com " ~/.ssh/known_hosts; then ssh-keyscan gitlab.com >> ~/.ssh/known_hosts; fi
           
-    - name: Add multiple hosts to known_hosts
-      run: |
-        ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
-        ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
-        
-    - name: Initialization and Fetching the Source Code
-      run: |
-        git config --global user.name "$USER_NAME"
-        git config --global user.email "$EMAIL"
-        
-    - name: Update Git configs
-      run: |
-        git config --global http.postBuffer 157286400
-        git clone --depth=1 git@github.com:nikgapps/updater.git
+      - name: Initialization and Fetching the Source Code
+        run: |
+          git config --global user.name "$USER_NAME"
+          git config --global user.email "$EMAIL"
+          
+      - name: Update Git configs
+        run: |
+          git config --global http.postBuffer 157286400
+          git clone --depth=1 git@github.com:nikgapps/updater.git
 
-    - name: Installing Requirements
-      run: |
-        python3 -m pip install wheel setuptools testresources lxml
-        cd updater
-        pip3 install -r requirements.txt
-        cd ..
+      - name: Installing Requirements
+        run: |
+          python3 -m pip install wheel setuptools testresources lxml
+          cd updater
+          pip3 install -r requirements.txt
+          cd ..
 
-    - name: Run steps in batch ${{ matrix.batch }}
-      run: |
-        start=${{ matrix.batch.start }}
-        end=${{ matrix.batch.end }}
+      - name: Run steps in batch ${{ matrix.batch }}
+        run: |
+          start=${{ matrix.batch.start }}
+          end=${{ matrix.batch.end }}
 
-        cd updater
-        python3 apkmirrorbatch.py -A 13 -S $start -E $end
-        cd ..
+          cd updater
+          python3 apkmirrorbatch.py -A 13 -S $start -E $end
+          cd ..
+
+  # Cleanup known_hosts file after execution
+  cleanup_execute_batches:
+    name: Cleanup Execute Batches
+    runs-on: ubuntu-latest
+    needs: [execute_batches]
+
+    steps:
+      - name: Cleanup known_hosts file
+        run: |
+          sed -i '/^frs\.sourceforge\.net /d' ~/.ssh/known_hosts
+          sed -i '/^gitlab\.com /d' ~/.ssh/known_hosts
