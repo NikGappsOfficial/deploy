@@ -1,0 +1,30 @@
+name: Grouped Execution Example
+
+on:
+  workflow_dispatch:
+
+jobs:
+  execute_steps:
+    name: Execute Steps
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        batch:
+          - {start: 1, end: 5}
+          - {start: 6, end: 10}
+          - {start: 11, end: 15}
+          # Add more batches as needed
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Run steps in batch ${{ matrix.batch.start }}-${{ matrix.batch.end }}
+      run: |
+        # Run the specific subset of steps based on the batch range
+        for i in $(seq ${{ matrix.batch.start }} ${{ matrix.batch.end }}); do
+          # Execute step $i
+          echo "Running step $i"
+          # Add your step execution logic here
+        done
