@@ -1,30 +1,74 @@
-name: Grouped Execution Example
+name: Dynamic Batch Execution Example
 
 on:
   workflow_dispatch:
 
 jobs:
-  execute_steps:
-    name: Execute Steps
+  generate_batches:
+    name: Generate Batches
     runs-on: ubuntu-latest
-    
+
+    outputs:
+      batch_matrix: ${{ steps.run_python.outputs.batch_matrix }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Setup SSH Keys and known_hosts 
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+            
+      - name: Add multiple hosts to known_hosts
+        run: |
+          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
+          
+      - name: Initialization and Fetching the Source Code
+        run: |
+          git config --global user.name "$USER_NAME"
+          git config --global user.email "$EMAIL"
+          
+      - name: Update Git configs
+        run: |
+          git config --global http.postBuffer 157286400
+          git clone --depth=1 git@github.com:nikgapps/updater.git
+
+      - name: Installing Requirements
+        run: |
+          python3 -m pip install wheel setuptools testresources lxml
+          cd updater
+          pip3 install -r requirements.txt
+          cd ..
+          
+      - name: Run Python program to generate batches
+        id: run_python
+        run: |
+          cd updater
+          python3 generate_batches.py > batches.json
+          echo "::set-output name=batch_matrix::$(cat batches.json)"
+
+  execute_batches:
+    name: Execute Batches
+    runs-on: ubuntu-latest
+    needs: generate_batches
+
     strategy:
       matrix:
-        batch:
-          - {start: 1, end: 5}
-          - {start: 6, end: 10}
-          - {start: 11, end: 15}
-          # Add more batches as needed
+        batch: ${{fromJson(needs.generate_batches.outputs.batch_matrix)}}
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Run steps in batch ${{ matrix.batch.start }}-${{ matrix.batch.end }}
+    - name: Run steps in batch ${{ matrix.batch }}
       run: |
+        start=${{ matrix.batch.start }}
+        end=${{ matrix.batch.end }}
+        
         # Run the specific subset of steps based on the batch range
-        for i in $(seq ${{ matrix.batch.start }} ${{ matrix.batch.end }}); do
-          # Execute step $i
-          echo "Running step $i"
+        for i in $(seq $start $end); do
+          echo "Running step for item $i"
           # Add your step execution logic here
         done
