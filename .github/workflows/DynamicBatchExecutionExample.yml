@@ -91,21 +91,9 @@ jobs:
 
     - name: Run steps in batch ${{ matrix.batch }}
       run: |
-        echo "START=${{ matrix.batch.start }}" >> $GITHUB_ENV
-        echo "END=${{ matrix.batch.end }}" >> $GITHUB_ENV
-
-        echo "START=${{ matrix.batch.start }}"
-        echo "END=${{ matrix.batch.end }}"
-
         start=${{ matrix.batch.start }}
         end=${{ matrix.batch.end }}
-        
-        # Run the specific subset of steps based on the batch range
-        for i in $(seq $start $end); do
-          echo "Running step for item $i"
-          # Add your step execution logic here
-        done
 
         cd updater
-        python3 apkmirrorbatch.py
+        python3 apkmirrorbatch.py -A 13 -S $start -E $end
         cd ..
