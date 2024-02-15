@@ -130,9 +130,9 @@ jobs:
           end=${{ matrix.batch.end }}
 
           cd updater
-          python3 apkmirrorbatch.py -A 13 -S $start -E $end
+          python3 apkmirrorupdates.py -A 13
           cd ..
-
+#   python3 apkmirrorbatch.py -A 13 -S $start -E $end
       # - name: Cleanup known_hosts file
       #   run: |
       #     sed -i '/^frs\.sourceforge\.net /d' ~/.ssh/known_hosts
