@@ -52,5 +52,5 @@ jobs:
        - name: Run ApkMirror
          run: |
             cd updater
-            python3 apkmirrorupdates.py
+            python3 apkmirrorupdates.py -A 14
             cd ..
