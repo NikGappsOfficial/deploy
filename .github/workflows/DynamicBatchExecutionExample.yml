@@ -49,10 +49,10 @@ jobs:
           python3 generate_batches.py > batches.json
           echo "::set-output name=batch_matrix::$(cat batches.json)"
       
-      - name: Cleanup known_hosts file
-        run: |
-          sed -i '/^frs\.sourceforge\.net /d' ~/.ssh/known_hosts
-          sed -i '/^gitlab\.com /d' ~/.ssh/known_hosts
+      # - name: Cleanup known_hosts file
+      #   run: |
+      #     sed -i '/^frs\.sourceforge\.net /d' ~/.ssh/known_hosts
+      #     sed -i '/^gitlab\.com /d' ~/.ssh/known_hosts
 
   execute_batches:
     name: Execute Batches
@@ -103,7 +103,7 @@ jobs:
           python3 apkmirrorbatch.py -A 13 -S $start -E $end
           cd ..
 
-      - name: Cleanup known_hosts file
-        run: |
-          sed -i '/^frs\.sourceforge\.net /d' ~/.ssh/known_hosts
-          sed -i '/^gitlab\.com /d' ~/.ssh/known_hosts
+      # - name: Cleanup known_hosts file
+      #   run: |
+      #     sed -i '/^frs\.sourceforge\.net /d' ~/.ssh/known_hosts
+      #     sed -i '/^gitlab\.com /d' ~/.ssh/known_hosts
