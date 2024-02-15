@@ -48,14 +48,7 @@ jobs:
           cd updater
           python3 generate_batches.py > batches.json
           echo "::set-output name=batch_matrix::$(cat batches.json)"
-
-  # Cleanup known_hosts file after execution
-  cleanup_generate_batches:
-    name: Cleanup Generate Batches
-    runs-on: ubuntu-latest
-    needs: [generate_batches]
-
-    steps:
+      
       - name: Cleanup known_hosts file
         run: |
           sed -i '/^frs\.sourceforge\.net /d' ~/.ssh/known_hosts
@@ -110,13 +103,6 @@ jobs:
           python3 apkmirrorbatch.py -A 13 -S $start -E $end
           cd ..
 
-  # Cleanup known_hosts file after execution
-  cleanup_execute_batches:
-    name: Cleanup Execute Batches
-    runs-on: ubuntu-latest
-    needs: [execute_batches]
-
-    steps:
       - name: Cleanup known_hosts file
         run: |
           sed -i '/^frs\.sourceforge\.net /d' ~/.ssh/known_hosts
