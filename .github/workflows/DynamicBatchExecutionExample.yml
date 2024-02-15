@@ -40,9 +40,9 @@ jobs:
           
       - name: Add hosts to known_hosts if missing
         run: |
-          if ! grep -q "^frs\.sourceforge\.net " ~/.ssh/known_hosts; then ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts; fi
-          if ! grep -q "^gitlab\.com " ~/.ssh/known_hosts; then ssh-keyscan gitlab.com >> ~/.ssh/known_hosts; fi
-          
+          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
+
       - name: Initialization and Fetching the Source Code
         run: |
           git config --global user.name "$USER_NAME"
@@ -104,8 +104,8 @@ jobs:
 
       - name: Add hosts to known_hosts if missing
         run: |
-          if ! grep -q "^frs\.sourceforge\.net " ~/.ssh/known_hosts; then ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts; fi
-          if ! grep -q "^gitlab\.com " ~/.ssh/known_hosts; then ssh-keyscan gitlab.com >> ~/.ssh/known_hosts; fi
+          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
           
       - name: Initialization and Fetching the Source Code
         run: |
