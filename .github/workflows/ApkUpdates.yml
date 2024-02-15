@@ -5,10 +5,8 @@ on:
 
 env:
   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-  REPOSITORY: ${{ secrets.REPOSITORY }}
   USER_NAME: ${{ secrets.USER_NAME }}
   EMAIL: ${{ secrets.EMAIL }}
-  SOURCE: ${{ secrets.SOURCE }}
   SF_PWD: ${{ secrets.SF_PWD }}
   RELEASE_TYPE: 'stable'
   ENVIRONMENT_TYPE: ${{ secrets.ENVIRONMENT_TYPE }}
