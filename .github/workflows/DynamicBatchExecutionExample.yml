@@ -19,11 +19,29 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.0
         with:
             ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-            
-      - name: Add hosts to known_hosts if missing
+      
+      # - name: Setup SSH Keys and known_hosts using kielabokkie
+      #   uses: kielabokkie/ssh-key-and-known-hosts-action@v1
+      #   with:
+      #     ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      #     ssh-host: gitlab.com
+
+      - name: Setup SSH keys and known hosts
         run: |
-          if ! grep -q "^frs\.sourceforge\.net " ~/.ssh/known_hosts; then ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts; fi
-          if ! grep -q "^gitlab\.com " ~/.ssh/known_hosts; then ssh-keyscan gitlab.com >> ~/.ssh/known_hosts; fi
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "gitlab.com" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          # Start the SSH agent
+          eval $(ssh-agent)
+          # Add the SSH private key to the SSH agent
+          ssh-add ~/.ssh/id_rsa
+          
+      # - name: Add hosts to known_hosts if missing
+      #   run: |
+      #     if ! grep -q "^frs\.sourceforge\.net " ~/.ssh/known_hosts; then ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts; fi
+      #     if ! grep -q "^gitlab\.com " ~/.ssh/known_hosts; then ssh-keyscan gitlab.com >> ~/.ssh/known_hosts; fi
           
       - name: Initialization and Fetching the Source Code
         run: |
@@ -72,11 +90,17 @@ jobs:
         with:
             ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
       
-      - name: Setup SSH Keys and known_hosts using kielabokkie
-        uses: kielabokkie/ssh-key-and-known-hosts-action@v1
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          ssh-host: gitlab.com
+      - name: Setup SSH keys and known hosts
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "gitlab.com" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          # Start the SSH agent
+          eval $(ssh-agent)
+          # Add the SSH private key to the SSH agent
+          ssh-add ~/.ssh/id_rsa
 
       # - name: Add hosts to known_hosts if missing
       #   run: |
