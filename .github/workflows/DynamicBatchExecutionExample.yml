@@ -64,6 +64,7 @@ jobs:
         id: run_python
         run: |
           cd updater
+          python3 apkmirrorbatch.py -A 13 -S 1 -E 5
           python3 generate_batches.py > batches.json
           echo "::set-output name=batch_matrix::$(cat batches.json)"
       
@@ -130,9 +131,9 @@ jobs:
           end=${{ matrix.batch.end }}
 
           cd updater
-          python3 apkmirrorupdates.py -A 13
+          python3 apkmirrorbatch.py -A 13 -S $start -E $end
           cd ..
-#   python3 apkmirrorbatch.py -A 13 -S $start -E $end
+
       # - name: Cleanup known_hosts file
       #   run: |
       #     sed -i '/^frs\.sourceforge\.net /d' ~/.ssh/known_hosts
