@@ -50,5 +50,7 @@ jobs:
        - name: Run ApkMirror
          run: |
             cd updater
-            python3 apkmirrorupdates.py -A 14
+            python3 apkmirrorbatch.py -A 13 -S 1 -E 5
+            python3 generate_batches.py > batches.json
+            echo "::set-output name=batch_matrix::$(cat batches.json)"
             cd ..
