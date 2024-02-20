@@ -48,13 +48,13 @@ jobs:
             python3 -m pip install wheel setuptools testresources lxml
             cd updater
             pip3 install -r requirements.txt
+            python3 apkmirrorbatch.py -A 13 -S 6 -E 8 
             cd ..
             
        - name: Run ApkMirror
          id: run_python
          run: |
             cd updater
-            python3 apkmirrorbatch.py -A 13 -S 6 -E 8 
             python3 generate_batches.py > batches.json
             echo "::set-output name=batch_matrix::$(cat batches.json)"
             cd ..
