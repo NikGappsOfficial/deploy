@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+  SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
   USER_NAME: ${{ secrets.USER_NAME }}
   EMAIL: ${{ secrets.EMAIL }}
   SF_PWD: ${{ secrets.SF_PWD }}
@@ -35,8 +35,8 @@ jobs:
             
        - name: Initialization and Fetching the Source Code
          run: |
-            git config --global user.name "$USER_NAME"
-            git config --global user.email "$EMAIL"
+            git config --global user.name "${USER_NAME}"
+            git config --global user.email "${EMAIL}"
             
        - name: Update Git configs
          run: |
@@ -55,7 +55,7 @@ jobs:
          run: |
             cd updater
             python3 generate_batches.py > batches.json
-            echo "::set-output name=batch_matrix::$(cat batches.json)"
+            echo "BATCH_MATRIX=$(cat batches.json)" >> $GITHUB_ENV
             cd ..
 
   execute_batches:
@@ -83,8 +83,8 @@ jobs:
           
       - name: Initialization and Fetching the Source Code
         run: |
-          git config --global user.name "$USER_NAME"
-          git config --global user.email "$EMAIL"
+          git config --global user.name "${USER_NAME}"
+          git config --global user.email "${EMAIL}"
           git config --global http.postBuffer 157286400
           git clone --depth=1 git@github.com:nikgapps/updater.git
 
