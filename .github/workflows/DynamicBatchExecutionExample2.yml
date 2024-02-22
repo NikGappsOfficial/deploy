@@ -60,7 +60,7 @@ jobs:
          run: |
             cd updater
             python3 generate_batches.py > batches.json
-            echo "::set-output name=batch_matrix::$(cat batches.json)"
+            echo "batch_matrix=$(cat batches.json)" >> $GITHUB_ENV
             cd ..
 
   execute_batches:
