@@ -2,6 +2,11 @@ name: Dynamic Batch Execution Example 2
 
 on:
   workflow_dispatch:
+    inputs:
+      android_version:
+        description: 'Android version (default: "14")'
+        default: '14'
+        required: false
 
 env:
   SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -101,5 +106,5 @@ jobs:
           end=${{ matrix.batch.end }}
 
           cd updater
-          python3 apkmirrorbatch.py -A 13 -S $start -E $end
+          python3 apkmirrorbatch.py -A ${{ github.event.inputs.android_version }} -S $start -E $end
           cd ..
