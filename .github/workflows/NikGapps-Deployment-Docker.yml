@@ -1,0 +1,150 @@
+name: NikGapps-Deployment-Docker
+
+on:
+  workflow_dispatch:
+    inputs:
+      android_versions:
+        description: 'Comma-separated list of Android versions'
+        required: false
+        default: '10,11,12.1,13,14'
+
+env:
+  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+  USER_NAME: ${{ secrets.USER_NAME }}
+  EMAIL: ${{ secrets.EMAIL }}
+  SF_PWD: ${{ secrets.SF_PWD }}
+  RELEASE_TYPE: 'stable'
+  ENVIRONMENT_TYPE: ${{ secrets.ENVIRONMENT_TYPE }}
+  PACKAGE_LIST: core,basic,omni,stock,full,go,addonsets,addons,debloater
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Set matrix values
+        id: set-matrix
+        run: |
+          MATRIX_VALUES="${{ github.event.inputs.android_versions }}"
+          if [ -z "$MATRIX_VALUES" ]; then
+            MATRIX_VALUES="10,11,12.1,13,14"
+          fi
+          MATRIX_JSON="[$(echo "$MATRIX_VALUES" | sed "s/,/\",\"/g" | sed "s/^/\"/" | sed "s/$/\"/")]"
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+          
+  update_overlays:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        android_version: ${{fromJson(needs.setup.outputs.matrix)}}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Setup SSH Keys and known_hosts 
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+            
+      - name: Setup SSH Keys and known_hosts using kielabokkie
+        uses: kielabokkie/ssh-key-and-known-hosts-action@v1
+        with:
+            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+            ssh-host: frs.sourceforge.net
+          
+      - name: Initialization and Fetching the Source Code
+        run: |
+           git config --global user.name "$USER_NAME"
+           git config --global user.email "$EMAIL"
+           git config --global http.postBuffer 157286400
+           
+      - name: Installing Requirements
+        run: |
+           sudo apt-get install zipalign
+           python3 -m pip install wheel setuptools testresources
+           python3 -m pip install NikGapps
+           mkdir NikGappsProject
+          
+      - name: Building Android Overlay
+        run: |
+           cd NikGappsProject
+           nikgapps_overlay -A ${{ matrix.android_version }}
+           cd ..
+           
+  build:
+    needs: [setup, update_overlays]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        android_version: ${{fromJson(needs.setup.outputs.matrix)}}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        
+      - name: Setup SSH Keys and known_hosts 
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Setup SSH Keys and known_hosts using kielabokkie
+        uses: kielabokkie/ssh-key-and-known-hosts-action@v1
+        with:
+            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+            ssh-host: frs.sourceforge.net
+
+      - name: Get Website and Release Source
+        run: |
+          git clone --depth=1 git@github.com:nikgapps/nikgapps.github.io.git
+          git clone git@github.com:nikgapps/release.git
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: nikgapps
+          password: ${{ secrets.AUTH }}
+  
+      - name: Pull latest Docker image
+        run: docker pull ghcr.io/nikgapps/docker:latest
+  
+      - name: Building Android ${{ matrix.android_version }} Gapps
+        run: |
+          mkdir NikGappsProject
+          cd NikGappsProject
+          MATRIX_VALUES="${{ needs.setup.outputs.matrix }}"
+          MATRIX_VALUES=$(echo "$MATRIX_VALUES" | tr -d '[]')
+          echo "MATRIX_VALUES=$MATRIX_VALUES"
+          IFS=',' read -ra VERSIONS <<< "$MATRIX_VALUES"  # Convert comma-separated string to array
+          max_version=$(printf "%s\n" "${VERSIONS[@]}" | sort -V | tail -n1)
+          echo "Max version is $max_version"
+          if [ "${{ matrix.android_version }}" == "$max_version" ]; then
+              echo "Updating website in the end"
+              docker run --rm \
+              -e USER_NAME="${{ secrets.USER_NAME }}" \
+              -e USER_EMAIL="${{ secrets.EMAIL }}" \
+              -e ANDROID_VERSION="${{ matrix.android_version }}" \
+              -e PACKAGE_LIST="${{ env.PACKAGE_LIST }}" \
+              -e SF_PWD="${{ secrets.SF_PWD }}" \
+              -e SSH_PRIVATE_KEY="${{ secrets.SSH_PRIVATE_KEY }}" \
+              ghcr.io/nikgapps/docker:latest \
+              "${{ secrets.USER_NAME }}" "${{ secrets.EMAIL }}" "${{ matrix.android_version }}" "${{ env.PACKAGE_LIST }}" "1"
+          else
+              echo "Not updating website in the end"
+              docker run --rm \
+              -e USER_NAME="${{ secrets.USER_NAME }}" \
+              -e USER_EMAIL="${{ secrets.EMAIL }}" \
+              -e ANDROID_VERSION="${{ matrix.android_version }}" \
+              -e PACKAGE_LIST="${{ env.PACKAGE_LIST }}" \
+              -e SF_PWD="${{ secrets.SF_PWD }}" \
+              -e SSH_PRIVATE_KEY="${{ secrets.SSH_PRIVATE_KEY }}" \
+              ghcr.io/nikgapps/docker:latest \
+              "${{ secrets.USER_NAME }}" "${{ secrets.EMAIL }}" "${{ matrix.android_version }}" "${{ env.PACKAGE_LIST }}" "0"
+          fi
+          cd ..
+
+          
+
+    

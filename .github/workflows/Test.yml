@@ -1,4 +1,4 @@
-name: Dynamic Batch Execution Example 2
+name: Dynamic Batch Execution Test
 
 on:
   workflow_dispatch:
