@@ -1,4 +1,4 @@
-name: NikGapps-Release
+name: NikGapps Release
 
 on:
   workflow_dispatch:
