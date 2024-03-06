@@ -1,4 +1,4 @@
-name: Dynamic Batch Execution Example 2
+name: Batch Apk Updates
 
 on:
   workflow_dispatch:
