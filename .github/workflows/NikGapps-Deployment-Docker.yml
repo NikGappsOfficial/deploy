@@ -15,7 +15,7 @@ env:
   SF_PWD: ${{ secrets.SF_PWD }}
   RELEASE_TYPE: 'stable'
   ENVIRONMENT_TYPE: ${{ secrets.ENVIRONMENT_TYPE }}
-  PACKAGE_LIST: core,basic
+  PACKAGE_LIST: core,basic,omni,stock,full,go,addonsets,addons,debloater
 
 jobs:
   setup:
@@ -90,8 +90,8 @@ jobs:
           -e SF_PWD="${{ secrets.SF_PWD }}" \
           -e SSH_PRIVATE_KEY="${{ secrets.SSH_PRIVATE_KEY }}" \
           -e UPDATE_WEBSITE="$update_website_flag" \
-          -e SIGN="0" \
-          -e UPLOAD="0" \
+          -e SIGN="1" \
+          -e UPLOAD="1" \
           -e RELEASE="0" \
           ghcr.io/nikgapps/docker:latest
           cd ..
