@@ -3,10 +3,10 @@ name: Dump Test
 on:
   workflow_dispatch:
     inputs:
-      android_versions:
-        description: 'Comma-separated list of Android versions'
+      url:
+        description: 'Image download url'
         required: false
-        default: '10,11,12.1,13,14'
+        default: 'https://dl.google.com/developers/android/udc/images/factory/husky_beta-ap21.240216.010-factory-e7ae4f3d.zip'
 
 env:
   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -45,9 +45,7 @@ jobs:
           -e USER_NAME="${{ secrets.USER_NAME }}" \
           -e USER_EMAIL="${{ secrets.EMAIL }}" \
           -e SSH_PRIVATE_KEY="${{ secrets.SSH_PRIVATE_KEY }}" \
-          -e SIGN="1" \
-          -e UPLOAD="1" \
-          -e RELEASE="0" \
+          -e URL="${{ github.event.inputs.url }}" \
           ghcr.io/nikgapps/afe:latest
           cd ..
       
