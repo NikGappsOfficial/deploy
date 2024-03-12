@@ -45,7 +45,7 @@ jobs:
           -e USER_NAME="${{ secrets.USER_NAME }}" \
           -e USER_EMAIL="${{ secrets.EMAIL }}" \
           -e SSH_PRIVATE_KEY="${{ secrets.SSH_PRIVATE_KEY }}" \
-          -e URL="${{ github.event.inputs.url }}" \
+          -e link="${{ github.event.inputs.url }}" \
           ghcr.io/nikgapps/afe:latest
           cd ..
       
