@@ -1,0 +1,53 @@
+name: Dump Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      android_versions:
+        description: 'Comma-separated list of Android versions'
+        required: false
+        default: '10,11,12.1,13,14'
+
+env:
+  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+  USER_NAME: ${{ secrets.USER_NAME }}
+  EMAIL: ${{ secrets.EMAIL }}
+  SF_PWD: ${{ secrets.SF_PWD }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        
+      - name: Setup SSH Keys and known_hosts 
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: nikgapps
+          password: ${{ secrets.AUTH }}
+  
+      - name: Pull latest Docker image
+        run: docker pull ghcr.io/nikgapps/afe:latest
+  
+      - name: Testing Docker
+        run: |
+          mkdir workspace
+          cd workspace
+          echo "Testing Docker"
+          docker run --rm \
+          -e USER_NAME="${{ secrets.USER_NAME }}" \
+          -e USER_EMAIL="${{ secrets.EMAIL }}" \
+          -e SSH_PRIVATE_KEY="${{ secrets.SSH_PRIVATE_KEY }}" \
+          -e SIGN="1" \
+          -e UPLOAD="1" \
+          -e RELEASE="0" \
+          ghcr.io/nikgapps/afe:latest
+          cd ..
+      
