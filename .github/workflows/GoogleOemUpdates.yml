@@ -47,5 +47,5 @@ jobs:
        - name: Run Google Oem Apk Updates
          run: |
             cd updater
-            python3 systeminfo.py
+            python3 main.py -A 14
             cd ..
