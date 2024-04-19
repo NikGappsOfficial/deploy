@@ -111,7 +111,7 @@ jobs:
           cd ..         
 
   build:
-    needs: [setup, CacheApks]
+    needs: [setup, UpdateOverlays]
     runs-on: macos-latest
     strategy:
       matrix:
