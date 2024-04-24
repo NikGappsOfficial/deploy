@@ -64,14 +64,17 @@ jobs:
           git config --global user.email "$EMAIL"
           git config --global http.postBuffer 1048576000
           git clone --depth=1 git@github.com:nikgapps/ondemand.git
-           
+          
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.12'
       - name: Installing Requirements
         run: |
           python3 -m pip install wheel setuptools testresources
           cd ondemand
           pip3 install -r requirements.txt
-          cd ..
-
+          cd ..     
+          
       - name: Building User Builds
         run: |
           cd ondemand
