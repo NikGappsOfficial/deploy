@@ -40,13 +40,16 @@ jobs:
             git config --global http.postBuffer 157286400
             git clone --depth=1 git@github.com:nikgapps/updater.git
 
+       - uses: actions/setup-python@v2
+         with:
+            python-version: '3.8'  # Specify the Python version that works for your project
        - name: Installing Requirements
          run: |
             python3 -m pip install wheel setuptools testresources lxml
             cd updater
             pip3 install -r requirements.txt
             cd ..
-            
+
        - name: Run ApkMirror
          run: |
             cd updater
