@@ -42,7 +42,7 @@ jobs:
 
        - uses: actions/setup-python@v2
          with:
-            python-version: '3.8'  # Specify the Python version that works for your project
+            python-version: '3.12'
        - name: Installing Requirements
          run: |
             python3 -m pip install wheel setuptools testresources lxml
