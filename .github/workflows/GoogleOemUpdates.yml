@@ -37,6 +37,9 @@ jobs:
             git config --global http.postBuffer 157286400
             git clone --depth=1 git@github.com:nikgapps/updater.git
 
+       - uses: actions/setup-python@v2
+         with:
+            python-version: '3.12'
        - name: Installing Requirements
          run: |
             python3 -m pip install wheel setuptools testresources lxml
@@ -47,5 +50,5 @@ jobs:
        - name: Run Google Oem Apk Updates
          run: |
             cd updater
-            python3 main.py -A 14
+            python3 oemupdates.py -A 14 -O husky
             cd ..
