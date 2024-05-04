@@ -2,6 +2,8 @@ name: Release Updates Test
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 1 * * *' 
 
 env:
   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
