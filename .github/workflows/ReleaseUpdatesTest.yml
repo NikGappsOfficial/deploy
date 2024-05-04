@@ -1,0 +1,56 @@
+name: Release Updates Test
+
+on:
+  workflow_dispatch:
+
+env:
+  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+  USER_NAME: ${{ secrets.USER_NAME }}
+  EMAIL: ${{ secrets.EMAIL }}
+  SF_PWD: ${{ secrets.SF_PWD }}
+
+jobs:
+  build:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        release-type: ['swift', 'next']  
+
+    steps:
+       - name: Checkout
+         uses: actions/checkout@main
+
+       - name: Setup SSH Keys and known_hosts 
+         uses: webfactory/ssh-agent@v0.9.0
+         with:
+             ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+             
+       - name: Add multiple hosts to known_hosts
+         run: |
+            ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+            ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
+            
+       - name: Initialization and Fetching the Source Code
+         run: |
+            git config --global user.name "$USER_NAME"
+            git config --global user.email "$EMAIL"
+            git config --global http.postBuffer 157286400
+            git clone --depth=1 git@github.com:nikgapps/updater.git
+
+       - uses: actions/setup-python@v2
+         with:
+            python-version: '3.12'
+
+       - name: Installing Requirements
+         run: |
+            python3 -m pip install wheel setuptools testresources lxml
+            cd updater
+            pip3 install -r requirements.txt
+            cd ..
+            
+       - name: Run Release Updates
+         run: |
+           cd updater
+           python3 build_repo.py -A 14 -R ${{ matrix.release-type }}
+           cd ..
+
