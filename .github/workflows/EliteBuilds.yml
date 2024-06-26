@@ -15,7 +15,7 @@ on:
   #       required: false
   #       default: '13,14'
   schedule:
-    - cron: '0/30 * * * *' 
+    - cron: '0/180 * * * *' 
 
 # Environment Variables
 env:
