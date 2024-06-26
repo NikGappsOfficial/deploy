@@ -8,7 +8,12 @@ on:
   #  branches: [ main ]
 
   # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+  # workflow_dispatch:
+  #   inputs:
+  #     android_versions:
+  #       description: 'Comma-separated list of Android versions'
+  #       required: false
+  #       default: '13,14'
   schedule:
     - cron: '0/30 * * * *' 
 
@@ -46,8 +51,8 @@ jobs:
       - name: Add multiple hosts to known_hosts
         run: |
           ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
-          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts 
-           
+          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts          
+
       - name: Environment Details and clean up
         run: |
           rm -rf Build 10 11 12 Releases canary-release release nikgapps.github.io TempPackages
@@ -64,29 +69,20 @@ jobs:
           git config --global user.email "$EMAIL"
           git config --global http.postBuffer 1048576000
           git clone --depth=1 git@github.com:nikgapps/ondemand.git
-
-      - uses: actions/setup-python@v5
-        with:
-            python-version: '3.12'
+           
       - name: Installing Requirements
         run: |
-            python3 -m pip install wheel setuptools testresources
-            cd ondemand
-            pip3 install -r requirements.txt
-            cd ..
-
-      - name: Building Android 13 Elite Builds
-        run: |
+          python3 -m pip install wheel setuptools testresources
           cd ondemand
-          python3 main.py -A 13 -U -e 1 -c
+          pip3 install -r requirements.txt
           cd ..
 
-      - name: Building Android 14 Elite Builds
+      - name: Building Android ${{ github.event.inputs.android_versions }} Elite Builds
         run: |
           cd ondemand
-          python3 main.py -A 14 -U -e 1 -c
+          python3 run_elite_builds.py -A 13,14 -U -c
           cd ..
-        
+
       - name: Updating download count
         run: |
           cd ondemand
