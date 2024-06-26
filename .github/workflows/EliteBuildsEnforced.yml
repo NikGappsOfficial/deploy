@@ -13,9 +13,9 @@ on:
       android_versions:
         description: 'Comma-separated list of Android versions'
         required: false
-        default: '13,14'
-  schedule:
-    - cron: '0/30 * * * *' 
+  #       default: '13,14'
+  # schedule:
+  #   - cron: '0/30 * * * *' 
 
 # Environment Variables
 env:
@@ -80,7 +80,7 @@ jobs:
       - name: Building Android ${{ github.event.inputs.android_versions }} Elite Builds
         run: |
           cd ondemand
-          python3 run_elite_builds.py -A ${{ github.event.inputs.android_versions }} -U -e 2 -c
+          python3 run_elite_builds_enforced.py -A ${{ github.event.inputs.android_versions }} -U -c
           cd ..
 
       - name: Updating download count
