@@ -41,7 +41,9 @@ jobs:
          run: |
           git config --global user.name "$USER_NAME"
           git config --global user.email "$EMAIL"
-            
+       - uses: actions/setup-python@v5
+         with:
+          python-version: '3.12'
        - name: Update Git configs
          run: |
           git config --global http.postBuffer 157286400
