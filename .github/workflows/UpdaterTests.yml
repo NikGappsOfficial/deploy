@@ -1,0 +1,56 @@
+name: Updater Tests
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #     - cron: '0 1 * * *'
+
+env:
+  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+  USER_NAME: ${{ secrets.USER_NAME }}
+  EMAIL: ${{ secrets.EMAIL }}
+  SF_PWD: ${{ secrets.SF_PWD }}
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+       - name: Checkout
+         uses: actions/checkout@main
+
+       - name: Setup SSH Keys and known_hosts 
+         uses: webfactory/ssh-agent@v0.9.0
+         with:
+             ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+             
+       - name: Add multiple hosts to known_hosts
+         run: |
+            ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+            ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
+            
+       - name: Initialization and Fetching the Source Code
+         run: |
+            git config --global user.name "$USER_NAME"
+            git config --global user.email "$EMAIL"
+            
+       - name: Update Git configs
+         run: |
+            git config --global http.postBuffer 157286400
+            git clone --depth=1 git@github.com:nikgapps/updater.git
+
+       - uses: actions/setup-python@v5
+         with:
+            python-version: '3.12'
+       - name: Installing Requirements
+         run: |
+            python3 -m pip install wheel setuptools testresources lxml
+            cd updater
+            pip3 install -r requirements.txt
+            cd ..
+            
+       - name: Run Reset Gitlab Repos
+         run: |
+            cd updater
+            python3 copy_gitlab_repo.py
+            cd ..
