@@ -162,7 +162,7 @@ jobs:
           RELEASE_TYPE: ${{ matrix.release_type }}
         run: |
           cd NikGappsProject
-          cache --androidVersion ${{ matrix.android_version }} --releaseType $RELEASE_TYPE
+          cache --androidVersion ${{ matrix.android_version }}
           cd ..         
 
   Build:
