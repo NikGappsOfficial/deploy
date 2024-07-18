@@ -13,12 +13,12 @@ env:
   USER_NAME: ${{ secrets.USER_NAME }}
   EMAIL: ${{ secrets.EMAIL }}
   SF_PWD: ${{ secrets.SF_PWD }}
-  RELEASE_TYPE: 'stable'
   ENVIRONMENT_TYPE: ${{ secrets.ENVIRONMENT_TYPE }}
-  PACKAGE_LIST: core,basic,omni,stock,full,go,addonsets,addons,debloater
+  PACKAGE_LIST: core,basic,omni,stock,full,go,addonsets,addons,debloater,removeotascripts
+  RELEASE_TYPE: 'stable'
 
 jobs:
-  setup:
+  Setup:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -34,11 +34,11 @@ jobs:
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
           
   UpdateOverlays:
-    needs: setup
+    needs: Setup
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        android_version: ${{fromJson(needs.setup.outputs.matrix)}}
+        android_version: ${{fromJson(needs.Setup.outputs.matrix)}}
     steps:
       - name: Checkout
         uses: actions/checkout@main
@@ -73,11 +73,12 @@ jobs:
            cd ..
   
   CacheApks:
-    needs: [setup, UpdateOverlays]
+    needs: [Setup, UpdateOverlays]
     runs-on: macos-latest
     strategy:
       matrix:
-        android_version: ${{fromJson(needs.setup.outputs.matrix)}}
+        android_version: ${{fromJson(needs.Setup.outputs.matrix)}}
+        release_type: ["stable", "ondemand"]
     steps:
       - name: Checkout
         uses: actions/checkout@main
@@ -104,18 +105,20 @@ jobs:
           python3 -m pip install NikGapps
           mkdir NikGappsProject
 
-      - name: Caching Apks for Android ${{ matrix.android_version }}
+      - name: Caching Apks for Android ${{ matrix.android_version }} with ${{ matrix.release_type }}
+        env:
+          RELEASE_TYPE: ${{ matrix.release_type }}
         run: |
           cd NikGappsProject
-          cache --androidVersion ${{ matrix.android_version }}
+          cache --androidVersion ${{ matrix.android_version }} --releaseType $RELEASE_TYPE
           cd ..         
 
-  build:
-    needs: [setup, UpdateOverlays]
+  Build:
+    needs: [Setup, UpdateOverlays]
     runs-on: macos-latest
     strategy:
       matrix:
-        android_version: ${{fromJson(needs.setup.outputs.matrix)}}
+        android_version: ${{fromJson(needs.Setup.outputs.matrix)}}
 
     steps:
        - name: Checkout
@@ -154,7 +157,7 @@ jobs:
        - name: Building Android ${{ matrix.android_version }} Gapps
          run: |
            cd NikGappsProject
-           MATRIX_VALUES="${{ needs.setup.outputs.matrix }}"
+           MATRIX_VALUES="${{ needs.Setup.outputs.matrix }}"
            MATRIX_VALUES=$(echo "$MATRIX_VALUES" | tr -d '[]')
            echo "MATRIX_VALUES=$MATRIX_VALUES"
            IFS=',' read -ra VERSIONS <<< "$MATRIX_VALUES"  # Convert comma-separated string to array
@@ -170,7 +173,7 @@ jobs:
            cd ..
 
   upload_config:
-    needs: build
+    needs: Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
