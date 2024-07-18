@@ -109,7 +109,7 @@ jobs:
       - name: Copy Repos for Android ${{ matrix.android_version }}
         run: |
            cd NikGappsProject
-           copy_repos.py -A ${{ matrix.android_version }}
+           copy_repos -A ${{ matrix.android_version }}
            cd ..
   
   CacheApks:
