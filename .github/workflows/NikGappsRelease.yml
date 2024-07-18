@@ -59,7 +59,11 @@ jobs:
            git config --global user.name "$USER_NAME"
            git config --global user.email "$EMAIL"
            git config --global http.postBuffer 157286400
-           
+      
+      - uses: actions/setup-python@v5
+         with:
+            python-version: '3.12'
+
       - name: Installing Requirements
         run: |
            sudo apt-get install zipalign
@@ -98,7 +102,11 @@ jobs:
            git config --global user.name "$USER_NAME"
            git config --global user.email "$EMAIL"
            git config --global http.postBuffer 157286400
-           
+
+      - uses: actions/setup-python@v5
+         with:
+            python-version: '3.12'
+
       - name: Installing Requirements
         run: |
            sudo apt-get install zipalign
@@ -137,8 +145,12 @@ jobs:
         run: |
           git config --global user.name "$USER_NAME"
           git config --global user.email "$EMAIL"
-          
-      - name: Update Git configs
+      
+      - uses: actions/setup-python@v5
+         with:
+            python-version: '3.12'
+
+      - name: Update Git configs and Install Requirements
         run: |
           git config --global http.postBuffer 157286400
           python3 -m pip install wheel setuptools testresources
@@ -178,6 +190,10 @@ jobs:
          run: |
             git config --global user.name "$USER_NAME"
             git config --global user.email "$EMAIL"
+
+       - uses: actions/setup-python@v5
+         with:
+            python-version: '3.12'
 
        - name: Installing Requirements
          run: |
@@ -233,6 +249,10 @@ jobs:
         run: |
             git config --global user.name "$USER_NAME"
             git config --global user.email "$EMAIL"
+
+      - uses: actions/setup-python@v5
+         with:
+            python-version: '3.12'
 
       - name: Installing Requirements
         run: |
