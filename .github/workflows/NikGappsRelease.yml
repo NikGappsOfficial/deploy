@@ -61,8 +61,8 @@ jobs:
            git config --global http.postBuffer 157286400
       
       - uses: actions/setup-python@v5
-         with:
-            python-version: '3.12'
+        with:
+          python-version: '3.12'
 
       - name: Installing Requirements
         run: |
@@ -104,8 +104,8 @@ jobs:
            git config --global http.postBuffer 157286400
 
       - uses: actions/setup-python@v5
-         with:
-            python-version: '3.12'
+        with:
+          python-version: '3.12'
 
       - name: Installing Requirements
         run: |
@@ -147,8 +147,8 @@ jobs:
           git config --global user.email "$EMAIL"
       
       - uses: actions/setup-python@v5
-         with:
-            python-version: '3.12'
+        with:
+          python-version: '3.12'
 
       - name: Update Git configs and Install Requirements
         run: |
@@ -251,8 +251,8 @@ jobs:
             git config --global user.email "$EMAIL"
 
       - uses: actions/setup-python@v5
-         with:
-            python-version: '3.12'
+        with:
+          python-version: '3.12'
 
       - name: Installing Requirements
         run: |
