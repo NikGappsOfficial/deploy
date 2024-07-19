@@ -126,7 +126,6 @@ jobs:
     strategy:
       matrix:
         android_version: ${{fromJson(needs.Setup.outputs.matrix)}}
-        release_type: ["stable", "ondemand"]
     steps:
       - name: Checkout
         uses: actions/checkout@main
@@ -157,9 +156,17 @@ jobs:
           python3 -m pip install NikGapps
           mkdir NikGappsProject
 
-      - name: Caching Apks for Android ${{ matrix.android_version }} with ${{ matrix.release_type }}
+      - name: Caching Apks for Android ${{ matrix.android_version }} with stable release type
         env:
-          RELEASE_TYPE: ${{ matrix.release_type }}
+          RELEASE_TYPE: "stable"
+        run: |
+          cd NikGappsProject
+          cache --androidVersion ${{ matrix.android_version }}
+          cd ..         
+
+      - name: Caching Apks for Android ${{ matrix.android_version }} with ondemand release type
+        env:
+          RELEASE_TYPE: "ondemand"
         run: |
           cd NikGappsProject
           cache --androidVersion ${{ matrix.android_version }}
@@ -228,7 +235,7 @@ jobs:
            fi
            cd ..
 
-  upload_config:
+  UploadConfig:
     needs: Build
     runs-on: ubuntu-latest
     steps:
