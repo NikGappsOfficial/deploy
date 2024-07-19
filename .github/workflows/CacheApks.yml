@@ -51,8 +51,18 @@ jobs:
           python3 -m pip install NikGapps
           mkdir NikGappsProject
 
-       - name: Caching Apks for Android ${{ matrix.android_version }}
+       - name: Caching Apks for Android ${{ matrix.android_version }} with stable release type
+         env:
+          RELEASE_TYPE: "stable"
          run: |
           cd NikGappsProject
           cache --androidVersion ${{ matrix.android_version }}
-          cd ..
+          cd ..         
+
+       - name: Caching Apks for Android ${{ matrix.android_version }} with ondemand release type
+         env:
+          RELEASE_TYPE: "ondemand"
+         run: |
+          cd NikGappsProject
+          cache --androidVersion ${{ matrix.android_version }}
+          cd ..  
