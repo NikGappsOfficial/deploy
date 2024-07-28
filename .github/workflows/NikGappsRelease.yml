@@ -129,7 +129,7 @@ jobs:
           cd ..   
 
   CopyRepos:
-    needs: [Setup, CacheApks]
+    needs: CacheApks
     runs-on: ubuntu-latest
     strategy:
       matrix:
