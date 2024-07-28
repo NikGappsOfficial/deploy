@@ -31,7 +31,7 @@ jobs:
           if [ -z "$MATRIX_VALUES" ]; then
             MATRIX_VALUES="10,11,12.1,13,14"
           fi
-          MATRIX_JSON="[$(echo "$MATRIX_VALUES" | sed "s/,/\",\"/g" | sed "s/^/\"/" | sed "s/$/\"/")]"
+          MATRIX_JSON="[$(echo "$MATRIX_VALUES" | sed 's/,/\",\"/g' | sed 's/^/\"/' | sed 's/$/\"/')]"
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
           
   UpdateOverlays:
@@ -67,8 +67,7 @@ jobs:
       - name: Installing Requirements
         run: |
            sudo apt-get update
-           sudo apt-get install -y adb
-           sudo apt-get install zipalign
+           sudo apt-get install -y adb zipalign
            python3 -m pip install wheel setuptools testresources
            python3 -m pip install NikGapps
            mkdir NikGappsProject
@@ -129,7 +128,7 @@ jobs:
           cd ..   
 
   CopyRepos:
-    needs: CacheApks
+    needs: [CacheApks]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -161,8 +160,7 @@ jobs:
       - name: Installing Requirements
         run: |
            sudo apt-get update
-           sudo apt-get install -y adb
-           sudo apt-get install zipalign
+           sudo apt-get install -y adb zipalign
            python3 -m pip install wheel setuptools testresources
            python3 -m pip install NikGapps
            mkdir NikGappsProject
