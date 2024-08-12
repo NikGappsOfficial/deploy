@@ -14,8 +14,8 @@ on:
   #       description: 'Comma-separated list of Android versions'
   #       required: false
   #       default: '13,14'
-  schedule:
-    - cron: '0 */3 * * *' 
+  # schedule:
+  #   - cron: '0 */3 * * *' 
 
 # Environment Variables
 env:

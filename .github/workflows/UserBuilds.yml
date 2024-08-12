@@ -73,7 +73,13 @@ jobs:
           python3 -m pip install wheel setuptools testresources
           cd ondemand
           pip3 install -r requirements.txt
-          cd ..     
+          cd ..
+
+      - name: Building Elite Builds
+        run: |
+          cd ondemand
+          python3 main.py -A 13,14 -U -c --eliteBuildsOnly
+          cd ..
           
       - name: Building User Builds
         run: |
