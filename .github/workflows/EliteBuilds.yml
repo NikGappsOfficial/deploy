@@ -83,7 +83,7 @@ jobs:
       - name: Building Android ${{ github.event.inputs.android_versions }} Elite Builds
         run: |
           cd ondemand
-          python3 run_elite_builds.py -A 13,14 -U -c
+          python3 main.py -A 13,14 -U -c --eliteBuildsOnly
           cd ..
 
       - name: Updating download count
