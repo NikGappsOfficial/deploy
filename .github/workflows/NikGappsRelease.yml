@@ -126,52 +126,7 @@ jobs:
           cd NikGappsProject
           cache --androidVersion ${{ matrix.android_version }}
           cd ..   
-
-  CopyRepos:
-    needs: [Setup, CacheApks]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        android_version: ${{fromJson(needs.Setup.outputs.matrix)}}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@main
-
-      - name: Setup SSH Keys and known_hosts 
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-            
-      - name: Add multiple hosts to known_hosts
-        run: |
-          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
-          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts 
-          
-      - name: Initialization and Fetching the Source Code
-        run: |
-           git config --global user.name "$USER_NAME"
-           git config --global user.email "$EMAIL"
-           git config --global http.postBuffer 1048576000
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Installing Requirements
-        run: |
-           sudo apt-get update
-           sudo apt-get install -y adb zipalign
-           python3 -m pip install wheel setuptools testresources
-           python3 -m pip install NikGapps
-           mkdir NikGappsProject
-          
-      - name: Copy Repos for Android ${{ matrix.android_version }}
-        run: |
-           cd NikGappsProject
-           copy_repos -A ${{ matrix.android_version }}
-           cd ..      
  
-
   Build:
     needs: [Setup, UpdateOverlays]
     runs-on: ubuntu-latest
