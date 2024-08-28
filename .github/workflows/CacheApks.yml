@@ -59,10 +59,3 @@ jobs:
           cache --androidVersion ${{ matrix.android_version }}
           cd ..         
 
-       - name: Caching Apks for Android ${{ matrix.android_version }} with ondemand release type
-         env:
-          RELEASE_TYPE: "ondemand"
-         run: |
-          cd NikGappsProject
-          cache --androidVersion ${{ matrix.android_version }}
-          cd ..  
