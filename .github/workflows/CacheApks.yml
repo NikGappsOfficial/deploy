@@ -16,6 +16,7 @@ env:
   RELEASE_TYPE: 'stable'
   ENVIRONMENT_TYPE: ${{ secrets.ENVIRONMENT_TYPE }}
   PACKAGE_LIST: core,basic,omni,stock,full,go,addonsets,addons,debloater
+  GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
 
 jobs:
   build:
