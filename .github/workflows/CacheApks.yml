@@ -20,7 +20,7 @@ env:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         android_version: ${{ fromJson(github.event.inputs.android_versions) }}
