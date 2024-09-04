@@ -1,0 +1,15 @@
+name: Check Disk Space
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  check-disk-space:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Print Disk Space
+        run: df -h /
