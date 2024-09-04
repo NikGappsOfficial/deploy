@@ -1,15 +1,16 @@
-name: Check Disk Space
+name: Check Disk Space on Multiple OS
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
   check-disk-space:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-20.04, ubuntu-18.04, macos-latest, windows-latest]
 
     steps:
       - name: Print Disk Space
-        run: df -h /
+        run: |
+          df -h /
