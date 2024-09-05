@@ -5,6 +5,12 @@ on:
   schedule:
     - cron: '0/30 * * * *'
 
+env:
+  auth: ${{ secrets.AUTH }}
+  deploy_auth: ${{ secrets.DEPLOY_AUTH }}
+  USER_NAME: ${{ secrets.USER_NAME }}
+  EMAIL: ${{ secrets.EMAIL }}
+
 jobs:
   cad-to-inr:
     runs-on: ubuntu-latest
