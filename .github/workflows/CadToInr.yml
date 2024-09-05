@@ -1,0 +1,37 @@
+name: CAD to INR Conversion Workflow
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0/30 * * * *'
+
+jobs:
+  cad-to-inr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+            python-version: '3.12'
+    
+      - name: Initialization and Fetching the Source Code
+        run: |
+          git config --global user.name "$USER_NAME"
+          git config --global user.email "$EMAIL"
+          git config --global http.postBuffer 1048576000
+          git clone --depth=1 git@github.com:nikhilmenghani/cron.git
+
+      - name: Installing Requirements
+        run: |
+          python3 -m pip install wheel setuptools testresources
+          cd cron
+          pip3 install -r requirements.txt
+          cd ..
+
+      - name: Run CAD to INR Conversion Script
+        run: |
+          cd cron
+          python3 main.py
