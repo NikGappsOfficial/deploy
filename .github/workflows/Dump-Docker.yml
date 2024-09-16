@@ -32,18 +32,32 @@ jobs:
           registry: ghcr.io
           username: nikgapps
           password: ${{ secrets.AUTH }}
-  
+
       - name: Pull latest Docker image
         run: docker pull ghcr.io/nikgapps/afe:latest
   
-      - name: Testing Docker
+      - name: Extract file name from URL
+        id: extract_filename
+        run: |
+          url="${{ github.event.inputs.url }}"
+          # Split URL by '/'
+          IFS='/' read -r -a url_parts <<< "$url"
+          # Loop through the parts and find the one containing '.zip'
+          for part in "${url_parts[@]}"; do
+            if [[ "$part" == *.zip ]]; then
+              filename="$part"
+              break
+            fi
+          done
+          echo "filename=${filename}" >> $GITHUB_ENV
+
+      - name: Extracting ${{ steps.extract_filename.outputs.filename }}
         run: |
           mkdir workspace
           cd workspace
-          echo "Testing Docker"
+          echo "Extracting ${{ steps.extract_filename.outputs.filename }}"
           docker run --rm \
           -e GITLAB_TOKEN="${{ secrets.GITLAB_TOKEN }}" \
           -e URL="${{ github.event.inputs.url }}" \
           ghcr.io/nikgapps/afe:latest /usr/src/workdir/run.sh
           cd ..
-      
