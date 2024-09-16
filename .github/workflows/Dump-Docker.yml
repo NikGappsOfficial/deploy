@@ -49,7 +49,10 @@ jobs:
               break
             fi
           done
-          echo "filename=${filename}" >> $GITHUB_ENV
+          echo "url=${url}"
+          echo "filename=${filename}"
+          # Use the new method to set outputs
+          echo "filename=$filename" >> $GITHUB_OUTPUT
 
       - name: Extracting ${{ steps.extract_filename.outputs.filename }}
         run: |
