@@ -38,6 +38,10 @@ jobs:
          run: |
            git config --global http.postBuffer 157286400
            git clone --depth=1 git@github.com:nikgapps/updater.git
+        
+       - uses: actions/setup-python@v5
+         with:
+            python-version: '3.12'
 
        - name: Installing Requirements
          run: |
