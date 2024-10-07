@@ -38,6 +38,10 @@ jobs:
             git config --global user.email "$EMAIL"
             git config --global http.postBuffer 157286400
             git clone --depth=1 git@github.com:nikgapps/updater.git
+       - name: Install adb
+         run: |
+            sudo apt-get update
+            sudo apt-get install -y adb
 
        - uses: actions/setup-python@v5
          with:
