@@ -1,0 +1,82 @@
+name: Copy Dev Branch to Beta Branch
+
+on:
+  workflow_dispatch:
+    inputs:
+      android_versions:
+        description: 'Comma-separated list of Android versions'
+        required: false
+        default: '15'
+
+env:
+  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+  USER_NAME: ${{ secrets.USER_NAME }}
+  EMAIL: ${{ secrets.EMAIL }}
+  SF_PWD: ${{ secrets.SF_PWD }}
+  ENVIRONMENT_TYPE: ${{ secrets.ENVIRONMENT_TYPE }}
+  RELEASE_TYPE: 'stable'
+  GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+
+jobs:
+  Setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Set matrix values
+        id: set-matrix
+        run: |
+          MATRIX_VALUES="${{ github.event.inputs.android_versions }}"
+          if [ -z "$MATRIX_VALUES" ]; then
+            MATRIX_VALUES="10,11,12.1,13,14"
+          fi
+          MATRIX_JSON="[$(echo "$MATRIX_VALUES" | sed 's/,/\",\"/g' | sed 's/^/\"/' | sed 's/$/\"/')]"
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+ 
+  Build:
+    needs: [Setup]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        android_version: ${{fromJson(needs.Setup.outputs.matrix)}}
+
+    steps:
+       - name: Checkout
+         uses: actions/checkout@main
+
+       - name: Setup SSH Keys and known_hosts 
+         uses: webfactory/ssh-agent@v0.9.0
+         with:
+             ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+             
+       - name: Add multiple hosts to known_hosts
+         run: |
+            ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+            ssh-keyscan gitlab.com >> ~/.ssh/known_hosts 
+
+       - name: Initialization and Fetching the Source Code
+         run: |
+            git config --global user.name "$USER_NAME"
+            git config --global user.email "$EMAIL"
+
+       - uses: actions/setup-python@v5
+         with:
+            python-version: '3.12'
+
+       - name: Installing Requirements
+         run: |
+            sudo apt-get update
+            sudo apt-get install -y adb
+            python3 -m pip install wheel setuptools testresources
+            python3 -m pip install NikGapps
+            mkdir NikGappsProject
+          
+       - name: Update Git configs
+         run: |
+           git config --global http.postBuffer 1048576000
+       
+       - name: Building Android ${{ matrix.android_version }} Gapps
+         run: |
+           cd NikGappsProject
+           copy_repos --androidVersion ${{ matrix.android_version }}
+           cd ..
