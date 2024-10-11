@@ -1,4 +1,4 @@
-name: Copy Dev Branch to Beta Branch
+name: NikGapps Beta Release
 
 on:
   workflow_dispatch:
@@ -13,8 +13,9 @@ env:
   USER_NAME: ${{ secrets.USER_NAME }}
   EMAIL: ${{ secrets.EMAIL }}
   SF_PWD: ${{ secrets.SF_PWD }}
-  ENVIRONMENT_TYPE: ${{ secrets.ENVIRONMENT_TYPE }}
-  RELEASE_TYPE: 'stable'
+  ENVIRONMENT_TYPE: dev
+  PACKAGE_LIST: core,omni,full
+  RELEASE_TYPE: 'beta'
   GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
 
 jobs:
@@ -28,13 +29,57 @@ jobs:
         run: |
           MATRIX_VALUES="${{ github.event.inputs.android_versions }}"
           if [ -z "$MATRIX_VALUES" ]; then
-            MATRIX_VALUES="10,11,12.1,13,14"
+            MATRIX_VALUES="10,11,12.1,13,14,15"
           fi
           MATRIX_JSON="[$(echo "$MATRIX_VALUES" | sed 's/,/\",\"/g' | sed 's/^/\"/' | sed 's/$/\"/')]"
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+          
+  UpdateOverlays:
+    needs: Setup
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        android_version: ${{fromJson(needs.Setup.outputs.matrix)}}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Setup SSH Keys and known_hosts 
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+            
+      - name: Add multiple hosts to known_hosts
+        run: |
+          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts 
+          
+      - name: Initialization and Fetching the Source Code
+        run: |
+           git config --global user.name "$USER_NAME"
+           git config --global user.email "$EMAIL"
+           git config --global http.postBuffer 1048576000
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Installing Requirements
+        run: |
+           sudo apt-get update
+           sudo apt-get install -y adb zipalign
+           python3 -m pip install wheel setuptools testresources
+           python3 -m pip install NikGapps
+           mkdir NikGappsProject
+          
+      - name: Building Android Overlay
+        run: |
+           cd NikGappsProject
+           nikgapps_overlay -A ${{ matrix.android_version }}
+           cd ..  
  
   Build:
-    needs: [Setup]
+    needs: [Setup, UpdateOverlays]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -71,12 +116,17 @@ jobs:
             python3 -m pip install NikGapps
             mkdir NikGappsProject
           
+       - name: Get Website and Release Source
+         run: |
+           git clone --depth=1 git@github.com:nikgapps/nikgapps.github.io.git
+           git clone git@github.com:nikgapps/release.git
+
        - name: Update Git configs
          run: |
            git config --global http.postBuffer 1048576000
        
-       - name: Copy Repo for Android ${{ matrix.android_version }}
+       - name: Building Android ${{ matrix.android_version }} Gapps
          run: |
            cd NikGappsProject
-           copy_repos --androidVersion ${{ matrix.android_version }}
+           nikgapps --sign --upload --androidVersion ${{ matrix.android_version }} --packageList $PACKAGE_LIST
            cd ..
