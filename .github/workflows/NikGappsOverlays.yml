@@ -69,6 +69,7 @@ jobs:
            sudo apt-get update
            sudo apt-get install -y adb zipalign
            python3 -m pip install wheel setuptools testresources
+           pip install --upgrade pip
            python3 -m pip install NikGapps
            mkdir NikGappsProject
           
