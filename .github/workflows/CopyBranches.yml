@@ -1,4 +1,4 @@
-name: Copy Dev Branch to Beta Branch
+name: Copy Branches
 
 on:
   workflow_dispatch:
@@ -67,6 +67,7 @@ jobs:
          run: |
             sudo apt-get update
             sudo apt-get install -y adb
+            pip install --upgrade pip
             python3 -m pip install wheel setuptools testresources
             python3 -m pip install NikGapps
             mkdir NikGappsProject
@@ -78,5 +79,5 @@ jobs:
        - name: Copy Repo for Android ${{ matrix.android_version }}
          run: |
            cd NikGappsProject
-           copy_repos --androidVersion ${{ matrix.android_version }}
+           copy_repos --android_version ${{ matrix.android_version }} --source dev --destination stable
            cd ..
