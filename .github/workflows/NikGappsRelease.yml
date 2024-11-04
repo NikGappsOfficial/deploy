@@ -78,54 +78,54 @@ jobs:
            nikgapps_overlay -A ${{ matrix.android_version }}
            cd ..
 
-  CacheApks:
-    needs: [Setup, UpdateOverlays]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        android_version: ${{fromJson(needs.Setup.outputs.matrix)}}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@main
+  # CacheApks:
+  #   needs: [Setup, UpdateOverlays]
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       android_version: ${{fromJson(needs.Setup.outputs.matrix)}}
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@main
 
-      - name: Setup SSH Keys and known_hosts 
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}      
+  #     - name: Setup SSH Keys and known_hosts 
+  #       uses: webfactory/ssh-agent@v0.9.0
+  #       with:
+  #           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}      
             
-      - name: Add multiple hosts to known_hosts
-        run: |
-          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
-          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
+  #     - name: Add multiple hosts to known_hosts
+  #       run: |
+  #         ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+  #         ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
           
-      - name: Initialization and Fetching the Source Code
-        run: |
-          git config --global user.name "$USER_NAME"
-          git config --global user.email "$EMAIL"
+  #     - name: Initialization and Fetching the Source Code
+  #       run: |
+  #         git config --global user.name "$USER_NAME"
+  #         git config --global user.email "$EMAIL"
       
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.12'
 
-      - name: Installing Requirements
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y adb
+  #     - name: Installing Requirements
+  #       run: |
+  #         sudo apt-get update
+  #         sudo apt-get install -y adb
 
-      - name: Update Git configs and Install Requirements
-        run: |
-          git config --global http.postBuffer 1048576000
-          python3 -m pip install wheel setuptools testresources
-          python3 -m pip install NikGapps
-          mkdir NikGappsProject
+  #     - name: Update Git configs and Install Requirements
+  #       run: |
+  #         git config --global http.postBuffer 1048576000
+  #         python3 -m pip install wheel setuptools testresources
+  #         python3 -m pip install NikGapps
+  #         mkdir NikGappsProject
 
-      - name: Caching Apks for Android ${{ matrix.android_version }} with stable release type
-        env:
-          RELEASE_TYPE: "stable"
-        run: |
-          cd NikGappsProject
-          cache --androidVersion ${{ matrix.android_version }}
-          cd ..   
+  #     - name: Caching Apks for Android ${{ matrix.android_version }} with stable release type
+  #       env:
+  #         RELEASE_TYPE: "stable"
+  #       run: |
+  #         cd NikGappsProject
+  #         cache --androidVersion ${{ matrix.android_version }}
+  #         cd ..   
  
   Build:
     needs: [Setup, UpdateOverlays]
