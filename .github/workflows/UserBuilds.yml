@@ -78,7 +78,7 @@ jobs:
       - name: Building Elite Builds
         run: |
           cd ondemand
-          python3 main.py -A 13,14 -U --eliteBuildsOnly
+          python3 main.py -A 13,14,15 -U --eliteBuildsOnly
           cd ..
           
       - name: Building User Builds
