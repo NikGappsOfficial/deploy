@@ -78,13 +78,13 @@ jobs:
       - name: Building Elite Builds
         run: |
           cd ondemand
-          python3 main.py -A 13,14,15 -U --eliteBuildsOnly
+          python3 main.py -A 13,14,15 -U -c --eliteBuildsOnly
           cd ..
           
       - name: Building User Builds
         run: |
           cd ondemand
-          python3 main.py -A 10,11,12,12.1,13,14 -U --userBuildsOnly
+          python3 main.py -A 10,11,12,12.1,13,14 -U -c --userBuildsOnly
           cd ..
      
       - name: Updating download count
