@@ -1,4 +1,4 @@
-name: Dump Test
+name: Google Oem Dumps
 
 on:
   workflow_dispatch:
