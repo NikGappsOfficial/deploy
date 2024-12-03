@@ -6,7 +6,7 @@ on:
       url:
         description: 'Image download url'
         required: false
-        default: 'https://dl.google.com/dl/android/aosp/caiman-ota-ad1a.240905.004-36913b8a.zip'
+        default: 'caiman'
 
 env:
   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
