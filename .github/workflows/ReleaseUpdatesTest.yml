@@ -10,13 +10,15 @@ env:
   USER_NAME: ${{ secrets.USER_NAME }}
   EMAIL: ${{ secrets.EMAIL }}
   SF_PWD: ${{ secrets.SF_PWD }}
+  GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        release-type: ['swift', 'next']  
+        # release-type: ['swift', 'next']  
+        release-type: ['next']  
 
     steps:
        - name: Checkout
@@ -58,6 +60,5 @@ jobs:
        - name: Run Release Updates
          run: |
            cd updater
-           python3 build_repo.py -A 14 -R ${{ matrix.release-type }}
+           python3 build_repo.py -A 15 -R ${{ matrix.release-type }}
            cd ..
-
