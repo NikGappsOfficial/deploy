@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        release-type: ['apkmirror', 'husky']  
+        release-type: ['caiman']  
 
     steps:
        - name: Checkout
@@ -58,5 +58,5 @@ jobs:
        - name: Run Oem Apk Updates
          run: |
            cd updater
-           python3 oemupdates.py -A 14 -O ${{ matrix.release-type }}
+           python3 oemupdates.py -A 15 -O ${{ matrix.release-type }}
            cd ..
