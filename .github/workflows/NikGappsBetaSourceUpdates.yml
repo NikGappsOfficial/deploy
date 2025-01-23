@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       url:
-        description: 'Image download url'
+        description: 'Image download URL'
         required: false
         default: 'caiman'
 
@@ -74,10 +74,6 @@ jobs:
   update_oem_repo:
     needs: extract_latest_oem_release
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        release-type: [${{ github.event.inputs.url }}]  
-
     steps:
        - name: Checkout
          uses: actions/checkout@main
@@ -118,7 +114,7 @@ jobs:
        - name: Run Oem Apk Updates
          run: |
            cd updater
-           python3 oemupdates.py -A 15 -O ${{ matrix.release-type }}
+           python3 oemupdates.py -A 15 -O "${{ github.event.inputs.url }}"
            cd ..
 
   build_beta:
@@ -126,7 +122,6 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # release-type: ['swift', 'next']  
         release-type: ['next']  
 
     steps:
