@@ -1,0 +1,173 @@
+name: NikGapps Beta Source Updates
+
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Image download url'
+        required: false
+        default: 'caiman'
+
+env:
+  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+  USER_NAME: ${{ secrets.USER_NAME }}
+  EMAIL: ${{ secrets.EMAIL }}
+  SF_PWD: ${{ secrets.SF_PWD }}
+  GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+
+jobs:
+  extract_latest_oem_release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup SSH Keys and known_hosts 
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: nikgapps
+          password: ${{ secrets.AUTH }}
+
+      - name: Pull latest Docker image
+        run: docker pull ghcr.io/nikgapps/afe:latest
+  
+      - name: Extract file name from URL
+        id: extract_filename
+        run: |
+          url="${{ github.event.inputs.url }}"
+          # Split URL by '/'
+          IFS='/' read -r -a url_parts <<< "$url"
+          # Loop through the parts and find the one containing '.zip'
+          for part in "${url_parts[@]}"; do
+            if [[ "$part" == *.zip ]]; then
+              filename="$part"
+              break
+            fi
+          done
+          if [[ "$filename" == "" ]]; then
+            filename="$url"
+          fi
+          echo "url=${url}"
+          echo "filename=${filename}"
+          # Use the new method to set outputs
+          echo "filename=$filename" >> $GITHUB_OUTPUT
+
+      - name: Extracting ${{ steps.extract_filename.outputs.filename }}
+        run: |
+          mkdir workspace
+          cd workspace
+          echo "Extracting ${{ steps.extract_filename.outputs.filename }}"
+          docker run --rm \
+          -e GITLAB_TOKEN="${{ secrets.GITLAB_TOKEN }}" \
+          -e URL="${{ github.event.inputs.url }}" \
+          ghcr.io/nikgapps/afe:latest /usr/src/workdir/run.sh
+          cd ..
+
+  update_oem_repo:
+  needs: extract_latest_oem_release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        release-type: [${{ github.event.inputs.url }}]  
+
+    steps:
+       - name: Checkout
+         uses: actions/checkout@main
+
+       - name: Setup SSH Keys and known_hosts 
+         uses: webfactory/ssh-agent@v0.9.0
+         with:
+             ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+             
+       - name: Add multiple hosts to known_hosts
+         run: |
+            ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+            ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
+            
+       - name: Initialization and Fetching the Source Code
+         run: |
+            git config --global user.name "$USER_NAME"
+            git config --global user.email "$EMAIL"
+            git config --global http.postBuffer 157286400
+            git clone --depth=1 git@github.com:nikgapps/updater.git
+            
+       - name: Install adb
+         run: |
+            sudo apt-get update
+            sudo apt-get install -y adb
+
+       - uses: actions/setup-python@v5
+         with:
+            python-version: '3.12'
+
+       - name: Installing Requirements
+         run: |
+            python3 -m pip install wheel setuptools testresources lxml
+            cd updater
+            pip3 install -r requirements.txt
+            cd ..
+            
+       - name: Run Oem Apk Updates
+         run: |
+           cd updater
+           python3 oemupdates.py -A 15 -O ${{ matrix.release-type }}
+           cd ..
+
+  build_beta:
+    needs: update_oem_repo
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # release-type: ['swift', 'next']  
+        release-type: ['next']  
+
+    steps:
+       - name: Checkout
+         uses: actions/checkout@main
+
+       - name: Setup SSH Keys and known_hosts 
+         uses: webfactory/ssh-agent@v0.9.0
+         with:
+             ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+             
+       - name: Add multiple hosts to known_hosts
+         run: |
+            ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+            ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
+            
+       - name: Initialization and Fetching the Source Code
+         run: |
+            git config --global user.name "$USER_NAME"
+            git config --global user.email "$EMAIL"
+            git config --global http.postBuffer 157286400
+            git clone --depth=1 git@github.com:nikgapps/updater.git
+            
+       - name: Install adb
+         run: |
+            sudo apt-get update
+            sudo apt-get install -y adb
+
+       - uses: actions/setup-python@v5
+         with:
+            python-version: '3.12'
+
+       - name: Installing Requirements
+         run: |
+            python3 -m pip install wheel setuptools testresources lxml
+            cd updater
+            pip3 install -r requirements.txt
+            cd ..
+            
+       - name: Run Release Updates
+         run: |
+           cd updater
+           python3 build_repo.py -A 15 -R ${{ matrix.release-type }}
+           cd ..
