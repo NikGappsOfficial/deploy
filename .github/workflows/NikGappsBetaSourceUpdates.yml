@@ -72,7 +72,7 @@ jobs:
           cd ..
 
   update_oem_repo:
-  needs: extract_latest_oem_release
+    needs: extract_latest_oem_release
     runs-on: ubuntu-latest
     strategy:
       matrix:
