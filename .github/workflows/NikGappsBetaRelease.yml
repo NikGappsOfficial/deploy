@@ -132,6 +132,7 @@ jobs:
        - name: Building Android ${{ matrix.android_version }} Gapps
          run: |
            cd project
+           export PYTHONPATH=$(pwd)
            cd NikGapps
            python3 main.py --sign --upload --androidVersion ${{ matrix.android_version }} --packageList $PACKAGE_LIST
            cd ..
