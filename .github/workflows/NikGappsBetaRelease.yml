@@ -14,7 +14,7 @@ env:
   EMAIL: ${{ secrets.EMAIL }}
   SF_PWD: ${{ secrets.SF_PWD }}
   ENVIRONMENT_TYPE: dev
-  PACKAGE_LIST: core,omni,full
+  PACKAGE_LIST: core,basic,omni,stock,full,go
   RELEASE_TYPE: 'beta'
   GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
 
@@ -113,8 +113,10 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y adb
             python3 -m pip install wheel setuptools testresources
-            python3 -m pip install NikGapps
-            mkdir NikGappsProject
+
+       - name: Setup NikGapps Repository
+         run: |
+            git clone --depth=1 git@github.com:nikgapps/project.git
           
        - name: Get Website and Release Source
          run: |
@@ -127,6 +129,6 @@ jobs:
        
        - name: Building Android ${{ matrix.android_version }} Gapps
          run: |
-           cd NikGappsProject
-           nikgapps --sign --upload --androidVersion ${{ matrix.android_version }} --packageList $PACKAGE_LIST
+           cd project/NikGapps
+           python main.py --sign --upload --androidVersion ${{ matrix.android_version }} --packageList $PACKAGE_LIST
            cd ..
