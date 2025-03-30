@@ -117,6 +117,8 @@ jobs:
        - name: Setup NikGapps Repository
          run: |
             git clone --depth=1 git@github.com:nikgapps/project.git
+            cd project
+            pip3 install -r requirements.txt
           
        - name: Get Website and Release Source
          run: |
@@ -129,6 +131,7 @@ jobs:
        
        - name: Building Android ${{ matrix.android_version }} Gapps
          run: |
-           cd project/NikGapps
-           python main.py --sign --upload --androidVersion ${{ matrix.android_version }} --packageList $PACKAGE_LIST
+           cd project
+           cd NikGapps
+           python3 main.py --sign --upload --androidVersion ${{ matrix.android_version }} --packageList $PACKAGE_LIST
            cd ..
