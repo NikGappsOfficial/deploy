@@ -3,7 +3,7 @@ name: CAD to INR Conversion Workflow
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0/60 * * * *'
+    - cron: '0 * * * *'
 
 env:
   auth: ${{ secrets.AUTH }}
