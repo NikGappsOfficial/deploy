@@ -70,7 +70,7 @@ jobs:
           python-version: '3.12'
       - name: Installing Requirements
         run: |
-          python3 -m pip install wheel setuptools testresources
+          python3 -m pip install wheel setuptools
           cd ondemand
           pip3 install -r requirements.txt
           cd ..

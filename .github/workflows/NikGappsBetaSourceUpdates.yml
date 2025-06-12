@@ -89,6 +89,12 @@ jobs:
          run: |
            ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
            ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
+       
+       - name: Install Git LFS
+         run: |
+            sudo apt-get update
+            sudo apt-get install -y git-lfs
+            git lfs install
             
        - name: Initialization and Fetching the Source Code
          run: |
@@ -139,6 +145,12 @@ jobs:
          run: |
            ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
            ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
+
+       - name: Install Git LFS
+         run: |
+            sudo apt-get update
+            sudo apt-get install -y git-lfs
+            git lfs install
             
        - name: Initialization and Fetching the Source Code
          run: |
