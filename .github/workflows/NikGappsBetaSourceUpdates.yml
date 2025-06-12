@@ -116,7 +116,7 @@ jobs:
        - name: Run Oem Apk Updates
          run: |
            cd updater
-           python3 oemupdates.py -A 15 -O "${{ github.event.inputs.url || env.DEFAULT_URL }}"
+           python3 oemupdates.py -A 16 -O "${{ github.event.inputs.url || env.DEFAULT_URL }}"
            cd ..
 
   build_beta:
@@ -166,5 +166,5 @@ jobs:
        - name: Run Release Updates
          run: |
            cd updater
-           python3 build_repo.py -A 15 -R ${{ matrix.release-type }}
+           python3 build_repo.py -A 16 -R ${{ matrix.release-type }}
            cd ..
