@@ -6,7 +6,7 @@ on:
       android_versions:
         description: 'Comma-separated list of Android versions'
         required: false
-        default: '["15","14","13","12.1","12","11","10"]'
+        default: '10,11,12.1,13,14,15,16'
 
 env:
   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -19,11 +19,26 @@ env:
   GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
 
 jobs:
+  Setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Set matrix values
+        id: set-matrix
+        run: |
+          MATRIX_VALUES="${{ github.event.inputs.android_versions }}"
+          if [ -z "$MATRIX_VALUES" ]; then
+            MATRIX_VALUES="10,11,12.1,13,14,15,16"
+          fi
+          MATRIX_JSON="[$(echo "$MATRIX_VALUES" | sed 's/,/\",\"/g' | sed 's/^/\"/' | sed 's/$/\"/')]"
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+          
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        android_version: ${{ fromJson(github.event.inputs.android_versions) }}
+        android_version: ${{fromJson(needs.Setup.outputs.matrix)}}
     steps:
        - name: Checkout
          uses: actions/checkout@main
@@ -44,7 +59,8 @@ jobs:
           git config --global user.email "$EMAIL"
        - uses: actions/setup-python@v5
          with:
-          python-version: '3.12'
+          python-version: '3.13'
+          
        - name: Update Git configs
          run: |
           git config --global http.postBuffer 157286400

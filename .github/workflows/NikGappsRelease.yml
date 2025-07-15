@@ -6,7 +6,7 @@ on:
       android_versions:
         description: 'Comma-separated list of Android versions'
         required: false
-        default: '10,11,12.1,13,14'
+        default: '10,11,12.1,13,14,15,16'
 
 env:
   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -29,7 +29,7 @@ jobs:
         run: |
           MATRIX_VALUES="${{ github.event.inputs.android_versions }}"
           if [ -z "$MATRIX_VALUES" ]; then
-            MATRIX_VALUES="10,11,12.1,13,14"
+            MATRIX_VALUES="10,11,12.1,13,14,15,16"
           fi
           MATRIX_JSON="[$(echo "$MATRIX_VALUES" | sed 's/,/\",\"/g' | sed 's/^/\"/' | sed 's/$/\"/')]"
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
@@ -62,7 +62,7 @@ jobs:
       
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.13'
 
       - name: Installing Requirements
         run: |
