@@ -67,7 +67,7 @@ jobs:
           
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.13'
       - name: Installing Requirements
         run: |
           python3 -m pip install wheel setuptools
@@ -78,13 +78,13 @@ jobs:
       - name: Building Elite Builds
         run: |
           cd ondemand
-          python3 main.py -A 11,13,14,15 -U -c --eliteBuildsOnly
+          python3 main.py -A 11,13,14,15,16 -U -c --eliteBuildsOnly
           cd ..
           
       - name: Building User Builds
         run: |
           cd ondemand
-          python3 main.py -A 10,11,12,12.1,13,14,15 -U -c --userBuildsOnly
+          python3 main.py -A 10,11,12,12.1,13,14,15,16 -U -c --userBuildsOnly
           cd ..
      
       - name: Updating download count
