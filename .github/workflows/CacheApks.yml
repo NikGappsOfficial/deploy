@@ -64,7 +64,7 @@ jobs:
 
        - name: Update Git configs
          run: |
-          git config --global http.postBuffer 157286400
+          git config --global http.postBuffer 1048576000
           python3 -m pip install wheel setuptools testresources
           python3 -m pip install NikGapps
           mkdir NikGappsProject
