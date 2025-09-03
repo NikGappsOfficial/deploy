@@ -8,7 +8,7 @@ on:
       url:
         description: 'Image download URL'
         required: false
-        default: 'caiman'
+        default: 'mustang'
 
 env:
   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -16,7 +16,7 @@ env:
   EMAIL: ${{ secrets.EMAIL }}
   SF_PWD: ${{ secrets.SF_PWD }}
   GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
-  DEFAULT_URL: 'caiman' # Default value for scheduled builds
+  DEFAULT_URL: 'mustang' # Default value for scheduled builds
 
 jobs:
   extract_latest_oem_release:

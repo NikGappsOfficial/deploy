@@ -6,7 +6,7 @@ on:
       url:
         description: 'Image download url'
         required: false
-        default: 'caiman'
+        default: 'mustang'
 
 env:
   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
