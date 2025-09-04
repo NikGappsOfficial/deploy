@@ -58,7 +58,7 @@ jobs:
          run: |
           git config --global user.name "$USER_NAME"
           git config --global user.email "$EMAIL"
-       - uses: actions/setup-python@v5
+       - uses: actions/setup-python@v6
          with:
           python-version: '3.13'
 
