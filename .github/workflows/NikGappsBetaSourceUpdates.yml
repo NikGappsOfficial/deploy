@@ -20,7 +20,7 @@ env:
 
 jobs:
   extract_latest_oem_release:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -75,7 +75,7 @@ jobs:
 
   update_oem_repo:
     needs: extract_latest_oem_release
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
        - name: Checkout
          uses: actions/checkout@main
@@ -127,7 +127,7 @@ jobs:
 
   build_beta:
     needs: update_oem_repo
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     strategy:
       matrix:
         release-type: ['next']  
