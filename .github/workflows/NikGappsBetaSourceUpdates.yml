@@ -20,7 +20,7 @@ env:
 
 jobs:
   extract_latest_oem_release:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -75,7 +75,7 @@ jobs:
 
   update_oem_repo:
     needs: extract_latest_oem_release
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
        - name: Checkout
          uses: actions/checkout@main
@@ -128,55 +128,54 @@ jobs:
   build_beta:
     needs: update_oem_repo
     runs-on: macos-latest
-    strategy:
-      matrix:
-        release-type: ['next']  
 
     steps:
-       - name: Checkout
-         uses: actions/checkout@main
+      - name: Checkout
+        uses: actions/checkout@v4
 
-       - name: Setup SSH Keys and known_hosts 
-         uses: webfactory/ssh-agent@v0.9.1
-         with:
-           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-             
-       - name: Add multiple hosts to known_hosts
-         run: |
-           ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
-           ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
+      - name: Setup SSH Keys and known_hosts
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-       - name: Install Git LFS
-         run: |
-            sudo apt-get update
-            sudo apt-get install -y git-lfs
-            git lfs install
-            
-       - name: Initialization and Fetching the Source Code
-         run: |
-           git config --global user.name "$USER_NAME"
-           git config --global user.email "$EMAIL"
-           git config --global http.postBuffer 157286400
-           git clone --depth=1 git@github.com:nikgapps/updater.git
-            
-       - name: Install adb
-         run: |
-           sudo apt-get update
-           sudo apt-get install -y adb
+      - name: Add multiple hosts to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
 
-       - uses: actions/setup-python@v6
-         with:
-           python-version: '3.12'
+      - name: Install Git LFS
+        run: |
+          brew update
+          brew install git-lfs
+          git lfs install
 
-       - name: Installing Requirements
-         run: |
-           python3 -m pip install wheel setuptools testresources lxml
-           cd updater
-           pip3 install -r requirements.txt
-           cd ..
-            
-       - name: Run Release Updates
-         run: |
-           cd updater
-           python3 build_repo.py -A 16 -R ${{ matrix.release-type }}
-           cd ..
+      - name: Initialization and Fetching the Source Code
+        run: |
+          git config --global user.name "$USER_NAME"
+          git config --global user.email "$EMAIL"
+          git config --global http.postBuffer 157286400
+          git clone --depth=1 git@github.com:nikgapps/updater.git
+
+      - name: Install adb (Android platform tools)
+        run: |
+          brew install android-platform-tools
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Installing Requirements
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install wheel setuptools testresources lxml
+          cd updater
+          pip3 install -r requirements.txt
+          cd ..
+
+      - name: Run Release Updates
+        run: |
+          cd updater
+          python3 build_repo.py -A 16 -R next
+          cd ..
+
