@@ -75,7 +75,7 @@ jobs:
 
   update_oem_repo:
     needs: extract_latest_oem_release
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
        - name: Checkout
          uses: actions/checkout@main
@@ -87,14 +87,15 @@ jobs:
              
        - name: Add multiple hosts to known_hosts
          run: |
+           mkdir -p ~/.ssh
            ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
            ssh-keyscan gitlab.com >> ~/.ssh/known_hosts  
-       
-       - name: Install Git LFS
+
+       - name: Install Git LFS (macOS)
          run: |
-            sudo apt-get update
-            sudo apt-get install -y git-lfs
-            git lfs install
+           brew update
+           brew install git-lfs
+           git lfs install
             
        - name: Initialization and Fetching the Source Code
          run: |
@@ -102,11 +103,11 @@ jobs:
            git config --global user.email "$EMAIL"
            git config --global http.postBuffer 157286400
            git clone --depth=1 git@github.com:nikgapps/updater.git
-            
-       - name: Install adb
+
+       - name: Install adb (Android platform tools) (macOS)
          run: |
-           sudo apt-get update
-           sudo apt-get install -y adb
+           brew update
+           brew install android-platform-tools
 
        - uses: actions/setup-python@v6
          with:
@@ -178,4 +179,3 @@ jobs:
           cd updater
           python3 build_repo.py -A 16 -R next
           cd ..
-
