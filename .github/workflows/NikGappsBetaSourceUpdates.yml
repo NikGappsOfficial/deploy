@@ -104,10 +104,17 @@ jobs:
            git config --global http.postBuffer 157286400
            git clone --depth=1 git@github.com:nikgapps/updater.git
 
-       - name: Install adb (Android platform tools) (macOS)
+       - name: Install adb Android platform tools macOS
+         if: runner.os == 'macOS'
+         env:
+           HOMEBREW_NO_AUTO_UPDATE: "1"
          run: |
-           brew update
-           brew install android-platform-tools
+           if command -v adb >/dev/null 2>&1; then
+             adb version
+           else
+             brew install android-platform-tools
+             adb version
+           fi
 
        - uses: actions/setup-python@v6
          with:
