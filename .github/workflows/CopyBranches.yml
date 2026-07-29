@@ -59,7 +59,7 @@ jobs:
             git config --global user.name "$USER_NAME"
             git config --global user.email "$EMAIL"
 
-       - uses: actions/setup-python@v6
+       - uses: actions/setup-python@v7
          with:
             python-version: '3.12'
 
