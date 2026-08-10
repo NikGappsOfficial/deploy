@@ -1,0 +1,79 @@
+name: NikGapps Android 17 Overlays
+
+on:
+  workflow_dispatch:
+    inputs:
+      nikgapps_version:
+        description: 'NikGapps PyPI version; blank installs the latest release'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  USER_NAME: ${{ secrets.USER_NAME }}
+  EMAIL: ${{ secrets.EMAIL }}
+  GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+  ANDROID_VERSION: '17'
+
+jobs:
+  build-overlays:
+    name: Build and publish Android 17 overlays
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout deployment repository
+        uses: actions/checkout@v7
+
+      - name: Set up SSH key
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Trust GitLab SSH host
+        run: ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "$USER_NAME"
+          git config --global user.email "$EMAIL"
+          git config --global http.postBuffer 1048576000
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Install overlay build dependencies
+        env:
+          NIKGAPPS_VERSION: ${{ inputs.nikgapps_version }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y adb zipalign
+          python -m pip install --upgrade pip wheel setuptools testresources
+          if [ -n "$NIKGAPPS_VERSION" ]; then
+            python -m pip install "NikGapps==$NIKGAPPS_VERSION"
+          else
+            python -m pip install NikGapps
+          fi
+
+      - name: Verify Android 17 support
+        run: |
+          python - <<'PY'
+          from NikGapps.helper.Assets import Assets
+          from NikGapps.overlay_control import register_android_platform
+          from niklibrary.helper.Statics import Statics
+
+          register_android_platform("17")
+          assert "17" in Assets.config_versions, "NikGapps release has no Android 17 config version"
+          assert Statics.get_android_sdk("17") == "37", "NikGapps release has no Android 17/API 37 mapping"
+          print(f"Android 17 overlay support verified; config version {Assets.config_versions['17']}")
+          PY
+
+      - name: Build and publish Android 17 overlays
+        run: |
+          mkdir NikGappsProject
+          cd NikGappsProject
+          nikgapps_overlay -A "$ANDROID_VERSION"
