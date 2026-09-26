@@ -8,7 +8,7 @@ on:
       url:
         description: 'Image download URL'
         required: false
-        default: 'mustang'
+        default: 'kodiak'
 
 env:
   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
