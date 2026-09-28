@@ -5,8 +5,14 @@ on:
     - cron: '0 1 * * *'
   workflow_dispatch:
     inputs:
-      url:
-        description: 'Image download URL'
+      android_version:
+        description: 'Android version, for example 17 or 12.1'
+        type: string
+        required: false
+        default: '17'
+      device:
+        description: 'Google device codename, for example kodiak'
+        type: string
         required: false
         default: 'kodiak'
 
@@ -16,11 +22,39 @@ env:
   EMAIL: ${{ secrets.EMAIL }}
   SF_PWD: ${{ secrets.SF_PWD }}
   GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
-  DEFAULT_URL: 'kodiak' # Default value for scheduled builds
+  DEFAULT_ANDROID_VERSION: '17'
+  DEFAULT_DEVICE: 'kodiak'
 
 jobs:
-  extract_latest_oem_release:
+  configure:
     runs-on: ubuntu-latest
+    outputs:
+      android_version: ${{ steps.target.outputs.android_version }}
+      device: ${{ steps.target.outputs.device }}
+    steps:
+      - name: Resolve update target
+        id: target
+        env:
+          ANDROID_VERSION: ${{ inputs.android_version || env.DEFAULT_ANDROID_VERSION }}
+          DEVICE: ${{ inputs.device || env.DEFAULT_DEVICE }}
+        shell: bash
+        run: |
+          if [[ ! "$ANDROID_VERSION" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+            echo "Invalid Android version: $ANDROID_VERSION" >&2
+            exit 1
+          fi
+          if [[ ! "$DEVICE" =~ ^[a-z0-9]+$ ]]; then
+            echo "Invalid Google device codename: $DEVICE" >&2
+            exit 1
+          fi
+          echo "android_version=$ANDROID_VERSION" >> "$GITHUB_OUTPUT"
+          echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
+
+  extract_latest_oem_release:
+    needs: configure
+    runs-on: ubuntu-latest
+    env:
+      DEVICE: ${{ needs.configure.outputs.device }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -40,42 +74,22 @@ jobs:
       - name: Pull latest Docker image
         run: docker pull ghcr.io/nikgapps/afe:latest
 
-      - name: Extract file name from URL
-        id: extract_filename
-        run: |
-          # Use the input URL if provided; otherwise, use the default value
-          url="${{ github.event.inputs.url || env.DEFAULT_URL }}"
-          # Split URL by '/'
-          IFS='/' read -r -a url_parts <<< "$url"
-          # Loop through the parts and find the one containing '.zip'
-          for part in "${url_parts[@]}"; do
-            if [[ "$part" == *.zip ]]; then
-              filename="$part"
-              break
-            fi
-          done
-          if [[ "$filename" == "" ]]; then
-            filename="$url"
-          fi
-          echo "url=${url}"
-          echo "filename=${filename}"
-          # Use the new method to set outputs
-          echo "filename=$filename" >> $GITHUB_OUTPUT
-
-      - name: Extracting ${{ steps.extract_filename.outputs.filename }}
+      - name: Extract or reuse latest OTA for ${{ needs.configure.outputs.device }}
         run: |
           mkdir workspace
           cd workspace
-          echo "Extracting ${{ steps.extract_filename.outputs.filename }}"
           docker run --rm \
           -e GITLAB_TOKEN="${{ secrets.GITLAB_TOKEN }}" \
-          -e URL="${{ github.event.inputs.url || env.DEFAULT_URL }}" \
+          -e URL="$DEVICE" \
           ghcr.io/nikgapps/afe:latest /usr/src/workdir/run.sh
           cd ..
 
   update_oem_repo:
-    needs: extract_latest_oem_release
+    needs: [configure, extract_latest_oem_release]
     runs-on: macos-latest
+    env:
+      ANDROID_VERSION: ${{ needs.configure.outputs.android_version }}
+      DEVICE: ${{ needs.configure.outputs.device }}
     steps:
        - name: Checkout
          uses: actions/checkout@main
@@ -130,12 +144,15 @@ jobs:
        - name: Run Oem Apk Updates
          run: |
            cd updater
-           python3 oemupdates.py -A 16 -O "${{ github.event.inputs.url || env.DEFAULT_URL }}"
+           python3 oemupdates.py -A "$ANDROID_VERSION" -O "$DEVICE"
            cd ..
 
   build_beta:
-    needs: update_oem_repo
+    needs: [configure, update_oem_repo]
     runs-on: macos-latest
+    env:
+      ANDROID_VERSION: ${{ needs.configure.outputs.android_version }}
+      DEVICE: ${{ needs.configure.outputs.device }}
 
     steps:
       - name: Checkout
@@ -184,5 +201,5 @@ jobs:
       - name: Run Release Updates
         run: |
           cd updater
-          python3 build_repo.py -A 16 -R next
+          python3 build_repo.py -A "$ANDROID_VERSION" -R next -O "$DEVICE"
           cd ..
