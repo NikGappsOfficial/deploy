@@ -84,7 +84,8 @@ jobs:
           ghcr.io/nikgapps/afe:latest /usr/src/workdir/run.sh
           cd ..
 
-  update_oem_repo:
+  update_sources_and_beta:
+    name: Sync OEM source and prepare beta
     needs: [configure, extract_latest_oem_release]
     runs-on: macos-latest
     env:
@@ -147,59 +148,8 @@ jobs:
            python3 oemupdates.py -A "$ANDROID_VERSION" -O "$DEVICE"
            cd ..
 
-  build_beta:
-    needs: [configure, update_oem_repo]
-    runs-on: macos-latest
-    env:
-      ANDROID_VERSION: ${{ needs.configure.outputs.android_version }}
-      DEVICE: ${{ needs.configure.outputs.device }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Setup SSH Keys and known_hosts
-        uses: webfactory/ssh-agent@v0.10.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Add multiple hosts to known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
-          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
-
-      - name: Install Git LFS
-        run: |
-          brew update
-          brew install git-lfs
-          git lfs install
-
-      - name: Initialization and Fetching the Source Code
-        run: |
-          git config --global user.name "$USER_NAME"
-          git config --global user.email "$EMAIL"
-          git config --global http.postBuffer 157286400
-          git clone --depth=1 git@github.com:nikgapps/updater.git
-
-      - name: Install adb (Android platform tools)
-        run: |
-          brew install android-platform-tools
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: '3.12'
-
-      - name: Installing Requirements
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install wheel setuptools testresources lxml
-          cd updater
-          pip3 install -r requirements.txt
-          cd ..
-
-      - name: Run Release Updates
-        run: |
-          cd updater
-          python3 build_repo.py -A "$ANDROID_VERSION" -R next -O "$DEVICE"
-          cd ..
+       - name: Prepare beta source from synced OEM repository
+         run: |
+           cd updater
+           python3 build_repo.py -A "$ANDROID_VERSION" -R next -O "$DEVICE"
+           cd ..
