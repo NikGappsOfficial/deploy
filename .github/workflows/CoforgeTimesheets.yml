@@ -3,7 +3,7 @@ name: Coforge Timesheets Workflow
 on:
   schedule:
   # 13:00 UTC on the first day of each month (09:00 Toronto during DST).
-  - cron: "0 13 1 * *"
+  - cron: "0 1 1 * *"
   workflow_dispatch:
     inputs:
       target_month:
