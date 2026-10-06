@@ -1,0 +1,64 @@
+name: Roll Back Stable Package Registry
+
+on:
+  workflow_dispatch:
+    inputs:
+      android_version:
+        description: Android version to roll back
+        type: string
+        required: true
+        default: '17'
+      prior_release_id:
+        description: Exact release ID previously active in releases/index.json
+        type: string
+        required: true
+      apply:
+        description: Publish rollback after validation (false = dry run)
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stable-registry-${{ inputs.android_version }}
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure GitLab access
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Clone catalog
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
+          git clone git@gitlab.com:nikgapps/nikgapps-package-catalog.git catalog
+          git -C catalog config user.name 'NikGapps Registry Rollback'
+          git -C catalog config user.email 'actions@users.noreply.github.com'
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Validate and optionally restore previous publication
+        shell: bash
+        env:
+          ANDROID_VERSION: ${{ inputs.android_version }}
+          PRIOR_RELEASE_ID: ${{ inputs.prior_release_id }}
+          APPLY: ${{ inputs.apply }}
+        run: |
+          args=(--repo catalog --android-version "$ANDROID_VERSION" --prior-release-id "$PRIOR_RELEASE_ID")
+          if [[ "$APPLY" == 'true' ]]; then args+=(--apply); fi
+          python rollback_stable_registry.py "${args[@]}"
