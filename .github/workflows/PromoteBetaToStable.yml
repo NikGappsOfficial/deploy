@@ -1,0 +1,97 @@
+name: Promote Beta Source to Stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      android_version:
+        description: Android version to promote
+        type: string
+        required: false
+        default: '17'
+  schedule:
+    # Twice monthly, after the start and middle of the month (09:00 UTC).
+    - cron: '0 9 2,16 * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beta-to-stable-${{ inputs.android_version || '17' }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      ANDROID_VERSION: ${{ inputs.android_version || '17' }}
+    steps:
+      - name: Validate target
+        shell: bash
+        run: |
+          if [[ ! "$ANDROID_VERSION" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+            echo "Invalid Android version: $ANDROID_VERSION" >&2
+            exit 1
+          fi
+
+      - name: Configure GitLab and GitHub SSH access
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Trust Git hosts and set commit identity
+        shell: bash
+        env:
+          USER_NAME: ${{ secrets.USER_NAME }}
+          EMAIL: ${{ secrets.EMAIL }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com gitlab.com >> ~/.ssh/known_hosts
+          git config --global user.name "$USER_NAME"
+          git config --global user.email "$EMAIL"
+          git lfs install
+
+      - name: Clone updater
+        run: git clone --depth=1 git@github.com:nikgapps/updater.git updater
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Locate Android aapt2
+        id: aapt2
+        shell: bash
+        run: |
+          AAPT2="$(find "$ANDROID_HOME/build-tools" -type f -name aapt2 | sort -V | tail -n 1)"
+          if [[ -z "$AAPT2" || ! -x "$AAPT2" ]]; then
+            echo "Android SDK build-tools/aapt2 is unavailable" >&2
+            exit 1
+          fi
+          echo "path=$AAPT2" >> "$GITHUB_OUTPUT"
+
+      - name: Promote beta source and commit stable changes
+        shell: bash
+        run: |
+          python updater/promote_beta_to_stable.py \
+            --android-version "$ANDROID_VERSION" \
+            --aapt2 "${{ steps.aapt2.outputs.path }}" \
+            --report promotion-review.json \
+            --apply
+
+      - name: Push stable if changed
+        shell: bash
+        run: |
+          STABLE="${ANDROID_VERSION}_stable"
+          if [[ "$(git -C "$STABLE" rev-list --count origin/main..HEAD)" -gt 0 ]]; then
+            git -C "$STABLE" push origin HEAD:main
+          else
+            echo "Stable already matches beta; nothing to push."
+          fi
+
+      - name: Upload promotion review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: promotion-review-${{ env.ANDROID_VERSION }}
+          path: promotion-review.json
+          if-no-files-found: ignore
