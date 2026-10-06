@@ -23,6 +23,8 @@ jobs:
   promote:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    outputs:
+      changed: ${{ steps.push.outputs.changed }}
     env:
       ANDROID_VERSION: ${{ inputs.android_version || '17' }}
     steps:
@@ -79,13 +81,16 @@ jobs:
             --apply
 
       - name: Push stable if changed
+        id: push
         shell: bash
         run: |
           STABLE="${ANDROID_VERSION}_stable"
           if [[ "$(git -C "$STABLE" rev-list --count origin/main..HEAD)" -gt 0 ]]; then
             git -C "$STABLE" push origin HEAD:main
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "Stable already matches beta; nothing to push."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload promotion review
@@ -95,3 +100,11 @@ jobs:
           name: promotion-review-${{ env.ANDROID_VERSION }}
           path: promotion-review.json
           if-no-files-found: ignore
+
+  publish_registry:
+    needs: promote
+    if: needs.promote.outputs.changed == 'true'
+    uses: ./.github/workflows/PublishStableRegistry.yml
+    with:
+      android_version: ${{ inputs.android_version || '17' }}
+    secrets: inherit
