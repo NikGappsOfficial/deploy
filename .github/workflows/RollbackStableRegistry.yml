@@ -48,7 +48,7 @@ jobs:
           git -C catalog config user.name 'NikGapps Registry Rollback'
           git -C catalog config user.email 'actions@users.noreply.github.com'
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
