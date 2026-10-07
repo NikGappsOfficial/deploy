@@ -111,7 +111,7 @@ jobs:
 
       - name: Upload publication manifest
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: registry-publication-${{ env.ANDROID_VERSION }}
           path: ${{ env.ANDROID_VERSION }}_REGISTRY_RELEASE/published-urls.json
