@@ -95,7 +95,7 @@ jobs:
 
       - name: Upload promotion review
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: promotion-review-${{ env.ANDROID_VERSION }}
           path: promotion-review.json
