@@ -19,7 +19,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: stable-registry-${{ inputs.android_version || '17' }}
+  # All versions commit shared registry metadata, so serialize publication.
+  group: stable-registry-publication
   cancel-in-progress: false
 
 jobs:
@@ -90,10 +91,10 @@ jobs:
           echo "busybox=$BUSYBOX" >> "$GITHUB_OUTPUT"
 
       - name: Verify Android configuration
-        run: python -m unittest tests_registry.test_android17_config -v
+        run: python -m unittest discover -s tests_registry -v
         working-directory: project
 
-      - name: Publish incremental stable packages and metadata
+      - name: Publish stable packages and automatic config revisions
         shell: bash
         run: |
           python -m nikgapps_registry sync \
@@ -114,5 +115,8 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: registry-publication-${{ env.ANDROID_VERSION }}
-          path: ${{ env.ANDROID_VERSION }}_REGISTRY_RELEASE/published-urls.json
+          path: |
+            ${{ env.ANDROID_VERSION }}_REGISTRY_RELEASE/published-urls.json
+            ${{ env.ANDROID_VERSION }}_REGISTRY_RELEASE/metadata/config-templates.json
+            ${{ env.ANDROID_VERSION }}_REGISTRY_RELEASE/metadata/releases/index.json
           if-no-files-found: ignore
