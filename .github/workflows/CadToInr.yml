@@ -4,6 +4,12 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 * * * *'
+    # 23:55 Toronto in daylight and standard time. The script handles the date.
+    - cron: '55 3,4 * * *'
+
+concurrency:
+  group: cad-to-inr
+  cancel-in-progress: false
 
 env:
   auth: ${{ secrets.AUTH }}
@@ -48,6 +54,12 @@ jobs:
           cd ..
 
       - name: Run CAD to INR Conversion Script
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
         run: |
           cd cron
-          python3 main.py
+          if [ "$SCHEDULE" = "55 3,4 * * *" ]; then
+            python3 main.py --daily-report
+          else
+            python3 main.py
+          fi
