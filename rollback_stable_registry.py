@@ -23,6 +23,10 @@ def pointer(index: dict, android: str, channel: str, arch: str) -> str | None:
     return index.get("latest", {}).get(android, {}).get(channel, {}).get(arch)
 
 
+def generated_metadata_path(path: str) -> bool:
+    return path in {"catalog.json", "appsets.json", "builder-assets.json", "config-templates.json"} or path.startswith("releases/")
+
+
 def verify_url(url: str, token: str) -> None:
     if not url.startswith("https://gitlab.com/api/v4/projects/"):
         raise ValueError(f"Unexpected artifact host: {url}")
@@ -63,6 +67,14 @@ def validate_release(parent: str, release_id: str, android: str, channel: str,
         raise ValueError("Prior release has no packages")
     for asset in assets.values():
         urls.add(asset["url"])
+    if manifest.get("configTemplate"):
+        urls.add(manifest["configTemplate"]["url"])
+    # Older publications predate config templates entirely.
+    if "config-templates.json" in git("ls-tree", "--name-only", parent).splitlines():
+        config = document(parent, "config-templates.json")["templates"][android]
+        if config["version"] != str(manifest.get("configVersion")):
+            raise ValueError("Prior config revision does not match its release")
+        urls.add(config["template"]["url"])
     for url in sorted(urls):
         verify_url(url, token)
     return len(manifest["packages"]), len(urls)
@@ -96,8 +108,7 @@ def main() -> int:
     if pointer(previous, args.android_version, args.channel, args.arch) != args.prior_release_id:
         raise ValueError("Only the immediately preceding catalog publication can be rolled back")
     changed = set(git("diff", "--name-only", parent, head).splitlines())
-    if not changed or any(not (path in {"catalog.json", "appsets.json", "builder-assets.json"}
-                               or path.startswith("releases/")) for path in changed):
+    if not changed or any(not generated_metadata_path(path) for path in changed):
         raise ValueError("Latest commit includes changes outside generated catalog metadata")
     count, checked = validate_release(parent, args.prior_release_id,
                                       args.android_version, args.channel, args.arch, token)
