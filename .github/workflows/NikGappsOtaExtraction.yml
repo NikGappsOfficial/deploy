@@ -31,9 +31,9 @@ on:
         default: true
         required: true
       save_extraction:
-        description: Save full TAR.XZ extraction (slow); disable for reports only
+        description: Save full TAR.XZ extraction (slow; opt in only)
         type: boolean
-        default: true
+        default: false
         required: true
 
 permissions:
