@@ -30,6 +30,11 @@ on:
         type: boolean
         default: true
         required: true
+      save_extraction:
+        description: Save full TAR.XZ extraction (slow); disable for reports only
+        type: boolean
+        default: true
+        required: true
 
 permissions:
   contents: read
@@ -40,7 +45,7 @@ concurrency:
 
 env:
   OPERATIONS_REPOSITORY: nikhilmenghani/nikgapps-operations
-  OPERATIONS_REVISION: 83142e968124c553a9c302b0db93cb94406fed89
+  OPERATIONS_REVISION: 61aac559cd1329e8b8f42b5728f641125ca76a6d
   EXECUTION_IMAGE: nikgapps-operations:extraction
 
 jobs:
@@ -118,6 +123,7 @@ jobs:
           BUILD: ${{ inputs.build }}
           BASELINE_NAMESPACE: ${{ inputs.baseline_namespace }}
           NOTIFY_TELEGRAM: ${{ inputs.notify_telegram }}
+          SAVE_EXTRACTION: ${{ inputs.save_extraction }}
           G_TOKEN: ${{ secrets.G_TOKEN }}
         shell: bash
         run: |
@@ -132,6 +138,9 @@ jobs:
           if [ "$NOTIFY_TELEGRAM" = 'true' ]; then
             arguments+=(--notify)
           fi
+          if [ "$SAVE_EXTRACTION" != 'true' ]; then
+            arguments+=(--skip-archive)
+          fi
           docker run --rm \
             --user "$(id -u):$(id -g)" \
             --env HOME=/tmp \
@@ -144,6 +153,7 @@ jobs:
             "$EXECUTION_IMAGE" /app/tools/extract_workflow.py "${arguments[@]}"
 
       - name: Save extracted OTA and checksum
+        if: ${{ inputs.save_extraction }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: nikgapps-ota-${{ inputs.device }}-${{ github.run_id }}
@@ -176,7 +186,8 @@ jobs:
                    f"Source ZIP retained: {run.get('sourceZipRetained', 'extraction did not complete')}",
                    f"Selection counts: {audit.get('counts', {})}", '',
                    f"Package/file changes: {run.get('tracking', {}).get('counts', {})}",
-                   'The complete extraction is saved as TAR.XZ for 3 days; JSON reports for 7 days.',
+                   f"Full extraction archived: {run.get('archiveCreated', False)}",
+                   'When requested, the TAR.XZ extraction is retained for 3 days; reports for 7 days.',
                    'This workflow does not create GitLab repositories or advance package channels.']
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
               stream.write('\n'.join(lines) + '\n')

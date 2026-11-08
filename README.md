@@ -23,6 +23,10 @@ on and use the same private recipient as cron's monthly document reports.
 Disable notifications using the workflow checkbox. Source repository creation
 and payload publication to GitLab are separate steps.
 
+For quicker report-only runs, disable **Save full TAR.XZ extraction**. Inventories,
+comparison reports and Telegram delivery still run; extracted data is then kept
+only on the ephemeral runner, while the small reports remain as artifacts.
+
 Repository secret `G_TOKEN` must read the private operations and myenv repos.
 The runtime data-only myenv loader requests only the GitLab and Nikhil Telegram
 bot credentials it needs. Tokens never enter image layers. Because deploy is
