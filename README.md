@@ -7,25 +7,34 @@ Run **Actions → NikGapps OTA Extraction → Run workflow**. Defaults are Andro
 OTA, or provide an exact Google build ID. The workflow is manual and does not
 change any existing scheduled pipeline.
 
-It checks out the pinned private `nikhilmenghani/nikgapps-operations` revision,
-builds its Linux execution image and tests, downloads/checks/extracts the OTA,
-then audits source rules and generates:
+It first discovers the selected OTA and checks the dated GitLab repository's
+`ota-completion.json`: exact OTA checksum, processing contract, payload directory
+hashes, all six report checksums and requested Telegram delivery. A verified
+completed build exits successfully **before Docker setup, download or extraction**.
+A matching existing source inventory can finish its missing reports without
+re-extracting the OTA.
+
+For a new build, the pinned private engine extracts and prepares the reviewed
+source files and overlays, creates a private dated GitLab repository, uploads
+binaries using Git LFS and verifies the remote branch. Existing unmatched payload
+repositories are never overwritten. Reports include:
 
 - `all_files.txt` and `packages.json`;
-- `updates.json` and searchable mobile `updates.html`, when an older matching
-  dated GitLab project has inventory data;
-- extraction/source-selection reports and a TAR.XZ extraction with SHA-256.
+- `updates.json` and searchable mobile `updates.html`;
+- readable `nikgapps-updates.md` and `nikgapps-updates.json`, restricted to configured
+  NikGapps packages, separating higher versionCodes from same-version payloads,
+  source holds, missing candidates and downgrades.
 
-The production execution mode deletes the source ZIP only after extraction
-succeeds. Extraction artifacts are retained for 3 days; reports for 7 days.
-The baseline namespace defaults to `nikgapps`. Telegram notifications default
-on and use the same private recipient as cron's monthly document reports.
-Disable notifications using the workflow checkbox. Source repository creation
-and payload publication to GitLab are separate steps.
+The completion record is written only after publication, report verification and
+requested private Telegram delivery. Failed work is not marked complete. Package
+channels are unchanged. A first build still needs an older inventory to produce
+comparison reports; absence of one fails explicitly rather than claiming success.
 
-For quicker report-only runs, disable **Save full TAR.XZ extraction**. Inventories,
-comparison reports and Telegram delivery still run; extracted data is then kept
-only on the ephemeral runner, while the small reports remain as artifacts.
+The production execution mode deletes the source ZIP after successful extraction.
+Full TAR.XZ backups are **off by default**; opt in only when explicitly needed.
+Requested backup artifacts are retained for 3 days; report artifacts for 7 days.
+GitLab source and reports persist independently. The baseline namespace defaults
+to `nikgapps`. Telegram uses cron's monthly-report private recipient.
 
 Repository secret `G_TOKEN` must read the private operations and myenv repos.
 The runtime data-only myenv loader requests only the GitLab and Nikhil Telegram

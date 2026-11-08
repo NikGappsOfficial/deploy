@@ -45,7 +45,7 @@ concurrency:
 
 env:
   OPERATIONS_REPOSITORY: nikhilmenghani/nikgapps-operations
-  OPERATIONS_REVISION: 61aac559cd1329e8b8f42b5728f641125ca76a6d
+  OPERATIONS_REVISION: 22aab45f92e3cb17e893f56fca14af5da0b9ce96
   EXECUTION_IMAGE: nikgapps-operations:extraction
 
 jobs:
@@ -76,7 +76,41 @@ jobs:
           path: operations
           persist-credentials: false
 
+      - name: Check durable OTA completion receipt
+        id: preflight
+        env:
+          G_TOKEN: ${{ secrets.G_TOKEN }}
+          DEVICE: ${{ inputs.device }}
+          ANDROID: ${{ inputs.android_version }}
+          BUILD: ${{ inputs.build }}
+          NAMESPACE: ${{ inputs.baseline_namespace || 'nikgapps' }}
+          NOTIFY: ${{ inputs.notify_telegram }}
+        run: |
+          python3 -m pip install --require-hashes -r operations/bootstrap.lock
+          args=(check --device "$DEVICE" --android "$ANDROID" --namespace "$NAMESPACE")
+          if [ -n "$BUILD" ]; then args+=(--build "$BUILD"); fi
+          if [ "$NOTIFY" = true ]; then args+=(--notify); fi
+          python3 operations/tools/ota_repo.py "${args[@]}"
+
+      - name: Complete reports for an existing source build without extraction
+        id: resume
+        if: steps.preflight.outputs.completed != 'true' && steps.preflight.outputs.reusable == 'true'
+        env:
+          G_TOKEN: ${{ secrets.G_TOKEN }}
+          DEVICE: ${{ inputs.device }}
+          ANDROID: ${{ inputs.android_version }}
+          BUILD: ${{ steps.preflight.outputs.build }}
+          NAMESPACE: ${{ inputs.baseline_namespace || 'nikgapps' }}
+          NOTIFY: ${{ inputs.notify_telegram }}
+        run: |
+          python3 -m pip install --require-hashes -r operations/report.lock
+          args=(finish --device "$DEVICE" --android "$ANDROID" --build "$BUILD" --namespace "$NAMESPACE")
+          if [ "$NOTIFY" = true ]; then args+=(--notify); fi
+          cd operations
+          python3 tools/ota_repo.py "${args[@]}"
+
       - name: Make room for sequential OTA extraction
+        if: steps.preflight.outputs.completed != 'true' && steps.resume.outputs.completed != 'true'
         shell: bash
         run: |
           python3 - <<'PY'
@@ -93,9 +127,11 @@ jobs:
           PY
 
       - name: Set up cached Linux image builder
+        if: steps.preflight.outputs.completed != 'true' && steps.resume.outputs.completed != 'true'
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
 
       - name: Cache public toolchain dependencies only
+        if: steps.preflight.outputs.completed != 'true' && steps.resume.outputs.completed != 'true'
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
         with:
           context: operations
@@ -105,6 +141,7 @@ jobs:
           cache-to: type=gha,mode=min,scope=nikgapps-ota-toolchain
 
       - name: Build private execution image and run engine tests
+        if: steps.preflight.outputs.completed != 'true' && steps.resume.outputs.completed != 'true'
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
         with:
           context: operations
@@ -117,10 +154,11 @@ jobs:
           # deploy is public: never export layers containing private application code.
 
       - name: Discover, download, verify, extract and audit
+        if: steps.preflight.outputs.completed != 'true' && steps.resume.outputs.completed != 'true'
         env:
           DEVICE: ${{ inputs.device }}
           ANDROID_VERSION: ${{ inputs.android_version }}
-          BUILD: ${{ inputs.build }}
+          BUILD: ${{ steps.preflight.outputs.build }}
           BASELINE_NAMESPACE: ${{ inputs.baseline_namespace }}
           NOTIFY_TELEGRAM: ${{ inputs.notify_telegram }}
           SAVE_EXTRACTION: ${{ inputs.save_extraction }}
@@ -152,8 +190,25 @@ jobs:
             --entrypoint python \
             "$EXECUTION_IMAGE" /app/tools/extract_workflow.py "${arguments[@]}"
 
+      - name: Publish source and reports and record verified completion
+        if: steps.preflight.outputs.completed != 'true' && steps.resume.outputs.completed != 'true'
+        env:
+          G_TOKEN: ${{ secrets.G_TOKEN }}
+          DEVICE: ${{ inputs.device }}
+          ANDROID: ${{ inputs.android_version }}
+          BUILD: ${{ steps.preflight.outputs.build }}
+          NAMESPACE: ${{ inputs.baseline_namespace || 'nikgapps' }}
+          NOTIFY: ${{ inputs.notify_telegram }}
+        run: |
+          folder=$(python3 -c 'import json,os; from pathlib import Path; p=Path(os.environ["RUNNER_TEMP"])/"nikgapps-ota/reports/run.json"; print("/work/"+json.loads(p.read_text())["extractedFolder"])')
+          args=(publish --device "$DEVICE" --android "$ANDROID" --build "$BUILD" --namespace "$NAMESPACE" --folder "$folder" --output /work/reports)
+          if [ "$NOTIFY" = true ]; then args+=(--notify); fi
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp --env G_TOKEN --env GITHUB_ACTIONS=true \
+            --mount "type=bind,source=$RUNNER_TEMP/nikgapps-ota,target=/work" \
+            --entrypoint python "$EXECUTION_IMAGE" /app/tools/ota_repo.py "${args[@]}"
+
       - name: Save extracted OTA and checksum
-        if: ${{ inputs.save_extraction }}
+        if: inputs.save_extraction && steps.preflight.outputs.completed != 'true' && steps.resume.outputs.completed != 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: nikgapps-ota-${{ inputs.device }}-${{ github.run_id }}
@@ -175,6 +230,10 @@ jobs:
         if: always()
         shell: bash
         run: |
+          if [ "${{ steps.preflight.outputs.completed }}" = true ] || [ "${{ steps.resume.outputs.completed }}" = true ]; then
+            echo '## Already complete: verified GitLab source inventory, reports and completion receipt. Skipped Docker, OTA download and extraction.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           python3 - <<'PY'
           import json, os
           from pathlib import Path
@@ -188,7 +247,7 @@ jobs:
                    f"Package/file changes: {run.get('tracking', {}).get('counts', {})}",
                    f"Full extraction archived: {run.get('archiveCreated', False)}",
                    'When requested, the TAR.XZ extraction is retained for 3 days; reports for 7 days.',
-                   'This workflow does not create GitLab repositories or advance package channels.']
+                   'Source and reports are persisted in the dated GitLab repository; package channels are unchanged.']
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
               stream.write('\n'.join(lines) + '\n')
           PY
