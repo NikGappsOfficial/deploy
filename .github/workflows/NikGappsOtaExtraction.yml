@@ -1,0 +1,183 @@
+name: NikGapps OTA Extraction
+run-name: Extract Android ${{ inputs.android_version }} OTA for ${{ inputs.device }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        description: Google device codename
+        type: string
+        default: kodiak
+        required: true
+      android_version:
+        description: Android version
+        type: choice
+        options: ['17']
+        default: '17'
+        required: true
+      build:
+        description: Exact build ID (leave empty to discover latest)
+        type: string
+        default: ''
+        required: false
+      baseline_namespace:
+        description: GitLab namespace to search for older dated inventory (empty disables lookup)
+        type: string
+        default: nikgapps
+        required: false
+      notify_telegram:
+        description: Send comparison and HTML to the monthly-report private Telegram chat
+        type: boolean
+        default: true
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ota-extraction-${{ inputs.android_version }}-${{ inputs.device }}
+  cancel-in-progress: false
+
+env:
+  OPERATIONS_REPOSITORY: nikhilmenghani/nikgapps-operations
+  OPERATIONS_REVISION: 83142e968124c553a9c302b0db93cb94406fed89
+  EXECUTION_IMAGE: nikgapps-operations:extraction
+
+jobs:
+  extract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check private operations checkout credential
+        env:
+          OPERATIONS_TOKEN: ${{ secrets.G_TOKEN }}
+        run: |
+          if [ -z "$OPERATIONS_TOKEN" ]; then
+            echo '::error::Configure G_TOKEN with read access to the private nikgapps-operations repository.'
+            exit 1
+          fi
+
+      - name: Checkout deploy
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Checkout tested operations revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ env.OPERATIONS_REPOSITORY }}
+          ref: ${{ env.OPERATIONS_REVISION }}
+          token: ${{ secrets.G_TOKEN }}
+          path: operations
+          persist-credentials: false
+
+      - name: Make room for sequential OTA extraction
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, shutil
+          # These unused SDKs belong to the disposable GitHub-hosted runner.
+          # Never apply this cleanup on a self-hosted machine.
+          if os.environ.get('RUNNER_ENVIRONMENT') == 'github-hosted':
+              for path in ('/usr/local/lib/android', '/usr/share/dotnet', '/opt/ghc', '/usr/local/.ghcup'):
+                  shutil.rmtree(path, ignore_errors=True)
+          free = shutil.disk_usage(os.environ['GITHUB_WORKSPACE']).free
+          print(f'Available disk: {free / 1024**3:.1f} GiB')
+          if free < 25 * 1024**3:
+              raise SystemExit('At least 25 GiB free is required for the OTA, partition scratch space and output artifact.')
+          PY
+
+      - name: Set up cached Linux image builder
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+
+      - name: Cache public toolchain dependencies only
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: operations
+          target: toolchain
+          push: false
+          cache-from: type=gha,scope=nikgapps-ota-toolchain
+          cache-to: type=gha,mode=min,scope=nikgapps-ota-toolchain
+
+      - name: Build private execution image and run engine tests
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: operations
+          target: execution
+          load: true
+          push: false
+          tags: ${{ env.EXECUTION_IMAGE }}
+          build-args: SOURCE_REVISION=${{ env.OPERATIONS_REVISION }}
+          cache-from: type=gha,scope=nikgapps-ota-toolchain
+          # deploy is public: never export layers containing private application code.
+
+      - name: Discover, download, verify, extract and audit
+        env:
+          DEVICE: ${{ inputs.device }}
+          ANDROID_VERSION: ${{ inputs.android_version }}
+          BUILD: ${{ inputs.build }}
+          BASELINE_NAMESPACE: ${{ inputs.baseline_namespace }}
+          NOTIFY_TELEGRAM: ${{ inputs.notify_telegram }}
+          G_TOKEN: ${{ secrets.G_TOKEN }}
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/nikgapps-ota"
+          arguments=(--root /work --device "$DEVICE" --android "$ANDROID_VERSION")
+          if [ -n "$BUILD" ]; then
+            arguments+=(--build "$BUILD")
+          fi
+          if [ -n "$BASELINE_NAMESPACE" ]; then
+            arguments+=(--baseline-namespace "$BASELINE_NAMESPACE")
+          fi
+          if [ "$NOTIFY_TELEGRAM" = 'true' ]; then
+            arguments+=(--notify)
+          fi
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --env HOME=/tmp \
+            --env GITHUB_ACTIONS=true \
+            --env FORCE_COLOR=1 \
+            --env PYTHONUNBUFFERED=1 \
+            --env G_TOKEN \
+            --mount "type=bind,source=$RUNNER_TEMP/nikgapps-ota,target=/work" \
+            --entrypoint python \
+            "$EXECUTION_IMAGE" /app/tools/extract_workflow.py "${arguments[@]}"
+
+      - name: Save extracted OTA and checksum
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nikgapps-ota-${{ inputs.device }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/nikgapps-ota/artifacts/*
+          compression-level: 0
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Save extraction and source-selection reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nikgapps-ota-reports-${{ github.run_id }}
+          path: ${{ runner.temp }}/nikgapps-ota/reports/*
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Summarize extraction
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          reports = Path(os.environ['RUNNER_TEMP']) / 'nikgapps-ota/reports'
+          run = json.loads((reports / 'run.json').read_text()) if (reports / 'run.json').exists() else {}
+          audit = json.loads((reports / 'source-selection.json').read_text()) if (reports / 'source-selection.json').exists() else {}
+          lines = ['## OTA extraction', '', f"Status: {run.get('status', 'not completed')}",
+                   f"Build: {run.get('selected', {}).get('build', 'unavailable')}",
+                   f"Source ZIP retained: {run.get('sourceZipRetained', 'extraction did not complete')}",
+                   f"Selection counts: {audit.get('counts', {})}", '',
+                   f"Package/file changes: {run.get('tracking', {}).get('counts', {})}",
+                   'The complete extraction is saved as TAR.XZ for 3 days; JSON reports for 7 days.',
+                   'This workflow does not create GitLab repositories or advance package channels.']
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
+              stream.write('\n'.join(lines) + '\n')
+          PY

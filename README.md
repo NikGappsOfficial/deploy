@@ -1,5 +1,38 @@
 # NikGapps deployment pipeline
 
+## Manual OTA extraction with the private operations engine
+
+Run **Actions → NikGapps OTA Extraction → Run workflow**. Defaults are Android
+17 and device `kodiak`; leave the build empty to discover the latest eligible
+OTA, or provide an exact Google build ID. The workflow is manual and does not
+change any existing scheduled pipeline.
+
+It checks out the pinned private `nikhilmenghani/nikgapps-operations` revision,
+builds its Linux execution image and tests, downloads/checks/extracts the OTA,
+then audits source rules and generates:
+
+- `all_files.txt` and `packages.json`;
+- `updates.json` and searchable mobile `updates.html`, when an older matching
+  dated GitLab project has inventory data;
+- extraction/source-selection reports and a TAR.XZ extraction with SHA-256.
+
+The production execution mode deletes the source ZIP only after extraction
+succeeds. Extraction artifacts are retained for 3 days; reports for 7 days.
+The baseline namespace defaults to `nikgapps`. Telegram notifications default
+on and use the same private recipient as cron's monthly document reports.
+Disable notifications using the workflow checkbox. Source repository creation
+and payload publication to GitLab are separate steps.
+
+Repository secret `G_TOKEN` must read the private operations and myenv repos.
+The runtime data-only myenv loader requests only the GitLab and Nikhil Telegram
+bot credentials it needs. Tokens never enter image layers. Because deploy is
+public, only the public toolchain stage is exported to the Actions build cache;
+private application layers remain on the ephemeral runner.
+
+The `OPERATIONS_REVISION` in
+`.github/workflows/NikGappsOtaExtraction.yml` pins the tested engine commit.
+Update that SHA deliberately when accepting another operations release.
+
 This repository orchestrates Google OEM extraction, source preparation,
 beta-to-stable promotion, and publication of the packages consumed by the
 NikGapps Android app. The examples below use **Android 17 / kodiak**;
