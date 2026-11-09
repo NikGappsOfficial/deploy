@@ -45,7 +45,7 @@ concurrency:
 
 env:
   OPERATIONS_REPOSITORY: nikhilmenghani/nikgapps-operations
-  OPERATIONS_REVISION: f20a88f7b09ec9d52df7556f4d76eb60ca2210a6
+  OPERATIONS_REVISION: 774dc5c0855a6ca4f63be80ffbb99601e1d95e32
   EXECUTION_IMAGE: nikgapps-operations:extraction
 
 jobs:
