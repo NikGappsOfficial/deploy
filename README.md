@@ -9,7 +9,7 @@ change any existing scheduled pipeline.
 
 It first discovers the selected OTA and checks the dated GitLab repository's
 `ota-completion.json`: exact build ID, OTA checksum, payload directory
-hashes, all six report checksums and requested Telegram delivery. A verified
+hashes, all report checksums and requested Telegram delivery. A verified
 completed build exits successfully **before Docker setup, download or extraction**.
 Code/settings changes alone do not trigger re-extraction. The **force_rerun**
 checkbox (off by default) explicitly bypasses completion and inventory reuse,
@@ -251,3 +251,9 @@ existing projects may remain pinned to their recorded release.
   publication or manual dispatch. `run.sh` also clones the oemdumps source at run
   time; changes to Docker-bundled tooling and the entrypoint require the image to
   be rebuilt.
+
+The reports-only path also compares sysconfig, other etc files and decoded overlay
+resources. `support-updates.md/json/html` separates actual resource changes from
+overlay APK bytes and signing/decoder metadata. Small text changes include
+verified diffs fetched at pinned GitLab commits; Telegram includes a support
+summary and an offline HTML attachment. No OTA download or extraction is used.
