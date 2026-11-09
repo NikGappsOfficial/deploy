@@ -257,3 +257,12 @@ resources. `support-updates.md/json/html` separates actual resource changes from
 overlay APK bytes and signing/decoder metadata. Small text changes include
 verified diffs fetched at pinned GitLab commits; Telegram includes a support
 summary and an offline HTML attachment. No OTA download or extraction is used.
+
+Source review is organized under `overlays/` and `etc/`. Each has three Markdown
+and HTML views: `all-diffs`, `nikgapps-inventory` (including unchanged references
+and packages with no match), and `nikgapps-diffs` (entry-level relevant changes).
+`index.md` links all views. Relevance uses supported Android package IDs and
+overlay targetPackage with source evidence; shared XML changes unrelated to
+those entries remain in all-diffs only. Source-reference indexes are cached
+under `metadata/`, including the baseline snapshot, to avoid repeated full scans.
+Telegram links all views and attaches the focused relevant-diff HTML reports.
