@@ -29,6 +29,18 @@ repositories are never overwritten. Reports include:
   NikGapps packages, separating higher versionCodes from same-version payloads,
   source holds, missing candidates and downgrades.
 
+For report-code changes, enable **regenerate_reports** and leave **force_rerun**
+off. This bypasses completion only for metadata regeneration: current and previous
+GitLab inventories are read, upgrade reports committed, and requested Telegram
+messages refreshed. Docker, OTA download, extraction, source publication and
+backups are explicitly disabled. Missing inventory fails rather than falling
+back to extraction. The two rerun options are mutually exclusive.
+
+The focused Markdown report requires both a higher versionCode and changed APK
+hashes to label an update required. Same-version file changes are review-only;
+metadata/location-only changes do not require an APK update. The report includes
+old/new versions, content-change flags and hashes.
+
 The completion record is written only after publication, report verification and
 requested private Telegram delivery. Failed work is not marked complete. Package
 channels are unchanged. A first build still needs an older inventory to produce
