@@ -30,6 +30,11 @@ on:
         type: boolean
         default: true
         required: true
+      force_rerun:
+        description: Re-extract and republish this build even if it already succeeded
+        type: boolean
+        default: false
+        required: true
       save_extraction:
         description: Save full TAR.XZ extraction (slow; opt in only)
         type: boolean
@@ -45,7 +50,7 @@ concurrency:
 
 env:
   OPERATIONS_REPOSITORY: nikhilmenghani/nikgapps-operations
-  OPERATIONS_REVISION: 1ab3e8aff280843c76cc2fd821dcc80568198794
+  OPERATIONS_REVISION: 9aa22523d50c1337dea43721cafce44259cdf4ad
   EXECUTION_IMAGE: nikgapps-operations:extraction
 
 jobs:
@@ -85,12 +90,14 @@ jobs:
           BUILD: ${{ inputs.build }}
           NAMESPACE: ${{ inputs.baseline_namespace || 'nikgapps' }}
           NOTIFY: ${{ inputs.notify_telegram }}
+          FORCE_RERUN: ${{ inputs.force_rerun }}
         run: |
           python3 -m venv "$RUNNER_TEMP/nikgapps-preflight"
           "$RUNNER_TEMP/nikgapps-preflight/bin/python" -m pip install --require-hashes -r operations/bootstrap.lock
           args=(check --device "$DEVICE" --android "$ANDROID" --namespace "$NAMESPACE")
           if [ -n "$BUILD" ]; then args+=(--build "$BUILD"); fi
           if [ "$NOTIFY" = true ]; then args+=(--notify); fi
+          if [ "$FORCE_RERUN" = true ]; then args+=(--force); fi
           "$RUNNER_TEMP/nikgapps-preflight/bin/python" operations/tools/ota_repo.py "${args[@]}"
 
       - name: Complete reports for an existing source build without extraction
@@ -201,10 +208,12 @@ jobs:
           BUILD: ${{ steps.preflight.outputs.build }}
           NAMESPACE: ${{ inputs.baseline_namespace || 'nikgapps' }}
           NOTIFY: ${{ inputs.notify_telegram }}
+          FORCE_RERUN: ${{ inputs.force_rerun }}
         run: |
           folder=$(python3 -c 'import json,os; from pathlib import Path; p=Path(os.environ["RUNNER_TEMP"])/"nikgapps-ota/reports/run.json"; print("/work/"+json.loads(p.read_text())["extractedFolder"])')
           args=(publish --device "$DEVICE" --android "$ANDROID" --build "$BUILD" --namespace "$NAMESPACE" --folder "$folder" --output /work/reports)
           if [ "$NOTIFY" = true ]; then args+=(--notify); fi
+          if [ "$FORCE_RERUN" = true ]; then args+=(--force); fi
           docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp --env G_TOKEN --env GITHUB_ACTIONS=true \
             --mount "type=bind,source=$RUNNER_TEMP/nikgapps-ota,target=/work" \
             --entrypoint python "$EXECUTION_IMAGE" /app/tools/ota_repo.py "${args[@]}"

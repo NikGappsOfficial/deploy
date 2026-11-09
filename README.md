@@ -8,9 +8,13 @@ OTA, or provide an exact Google build ID. The workflow is manual and does not
 change any existing scheduled pipeline.
 
 It first discovers the selected OTA and checks the dated GitLab repository's
-`ota-completion.json`: exact OTA checksum, processing contract, payload directory
+`ota-completion.json`: exact build ID, OTA checksum, payload directory
 hashes, all six report checksums and requested Telegram delivery. A verified
 completed build exits successfully **before Docker setup, download or extraction**.
+Code/settings changes alone do not trigger re-extraction. The **force_rerun**
+checkbox (off by default) explicitly bypasses completion and inventory reuse,
+then appends the replacement source snapshot to the existing branch without
+rewriting history.
 A matching existing source inventory can finish its missing reports without
 re-extracting the OTA.
 
@@ -19,7 +23,7 @@ source files and overlays, creates a private dated GitLab repository, uploads
 binaries using Git LFS and verifies the remote branch. Existing unmatched payload
 repositories are never overwritten. Reports include:
 
-- `all_files.txt` and `packages.json`;
+- `all_files.txt` and `packages.json` alongside the extracted files and in GitLab;
 - `updates.json` and searchable mobile `updates.html`;
 - readable `nikgapps-updates.md` and `nikgapps-updates.json`, restricted to configured
   NikGapps packages, separating higher versionCodes from same-version payloads,
