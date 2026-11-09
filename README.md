@@ -42,6 +42,11 @@ bot credentials it needs. Tokens never enter image layers. Because deploy is
 public, only the public toolchain stage is exported to the Actions build cache;
 private application layers remain on the ephemeral runner.
 
+The preflight and metadata-only report paths use a small virtual environment
+with hash-locked dependencies. A completed build skips the Docker image build,
+OTA download, extraction and publication. The summary reports extraction and
+GitLab publication separately so a failed upload cannot look complete.
+
 The `OPERATIONS_REVISION` in
 `.github/workflows/NikGappsOtaExtraction.yml` pins the tested engine commit.
 Update that SHA deliberately when accepting another operations release.

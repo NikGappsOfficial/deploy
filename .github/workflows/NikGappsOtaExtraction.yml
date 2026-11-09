@@ -21,7 +21,7 @@ on:
         default: ''
         required: false
       baseline_namespace:
-        description: GitLab namespace to search for older dated inventory (empty disables lookup)
+        description: GitLab namespace for dated source repositories and comparison inventories
         type: string
         default: nikgapps
         required: false
@@ -45,7 +45,7 @@ concurrency:
 
 env:
   OPERATIONS_REPOSITORY: nikhilmenghani/nikgapps-operations
-  OPERATIONS_REVISION: 27544eca5378fabcdced7e1ee4f315f79c91f5ed
+  OPERATIONS_REVISION: 1ab3e8aff280843c76cc2fd821dcc80568198794
   EXECUTION_IMAGE: nikgapps-operations:extraction
 
 jobs:
@@ -86,11 +86,12 @@ jobs:
           NAMESPACE: ${{ inputs.baseline_namespace || 'nikgapps' }}
           NOTIFY: ${{ inputs.notify_telegram }}
         run: |
-          python3 -m pip install --require-hashes -r operations/bootstrap.lock
+          python3 -m venv "$RUNNER_TEMP/nikgapps-preflight"
+          "$RUNNER_TEMP/nikgapps-preflight/bin/python" -m pip install --require-hashes -r operations/bootstrap.lock
           args=(check --device "$DEVICE" --android "$ANDROID" --namespace "$NAMESPACE")
           if [ -n "$BUILD" ]; then args+=(--build "$BUILD"); fi
           if [ "$NOTIFY" = true ]; then args+=(--notify); fi
-          python3 operations/tools/ota_repo.py "${args[@]}"
+          "$RUNNER_TEMP/nikgapps-preflight/bin/python" operations/tools/ota_repo.py "${args[@]}"
 
       - name: Complete reports for an existing source build without extraction
         id: resume
@@ -103,11 +104,11 @@ jobs:
           NAMESPACE: ${{ inputs.baseline_namespace || 'nikgapps' }}
           NOTIFY: ${{ inputs.notify_telegram }}
         run: |
-          python3 -m pip install --require-hashes -r operations/report.lock
+          "$RUNNER_TEMP/nikgapps-preflight/bin/python" -m pip install --require-hashes -r operations/report.lock
           args=(finish --device "$DEVICE" --android "$ANDROID" --build "$BUILD" --namespace "$NAMESPACE")
           if [ "$NOTIFY" = true ]; then args+=(--notify); fi
           cd operations
-          python3 tools/ota_repo.py "${args[@]}"
+          "$RUNNER_TEMP/nikgapps-preflight/bin/python" tools/ota_repo.py "${args[@]}"
 
       - name: Make room for sequential OTA extraction
         if: steps.preflight.outputs.completed != 'true' && steps.resume.outputs.completed != 'true'
@@ -159,7 +160,7 @@ jobs:
           DEVICE: ${{ inputs.device }}
           ANDROID_VERSION: ${{ inputs.android_version }}
           BUILD: ${{ steps.preflight.outputs.build }}
-          BASELINE_NAMESPACE: ${{ inputs.baseline_namespace }}
+          BASELINE_NAMESPACE: ${{ inputs.baseline_namespace || 'nikgapps' }}
           NOTIFY_TELEGRAM: ${{ inputs.notify_telegram }}
           SAVE_EXTRACTION: ${{ inputs.save_extraction }}
           G_TOKEN: ${{ secrets.G_TOKEN }}
@@ -191,6 +192,7 @@ jobs:
             "$EXECUTION_IMAGE" /app/tools/extract_workflow.py "${arguments[@]}"
 
       - name: Publish source and reports and record verified completion
+        id: publication
         if: steps.preflight.outputs.completed != 'true' && steps.resume.outputs.completed != 'true'
         env:
           G_TOKEN: ${{ secrets.G_TOKEN }}
@@ -228,6 +230,8 @@ jobs:
 
       - name: Summarize extraction
         if: always()
+        env:
+          PUBLICATION_OUTCOME: ${{ steps.publication.outcome }}
         shell: bash
         run: |
           if [ "${{ steps.preflight.outputs.completed }}" = true ] || [ "${{ steps.resume.outputs.completed }}" = true ]; then
@@ -240,14 +244,15 @@ jobs:
           reports = Path(os.environ['RUNNER_TEMP']) / 'nikgapps-ota/reports'
           run = json.loads((reports / 'run.json').read_text()) if (reports / 'run.json').exists() else {}
           audit = json.loads((reports / 'source-selection.json').read_text()) if (reports / 'source-selection.json').exists() else {}
-          lines = ['## OTA extraction', '', f"Status: {run.get('status', 'not completed')}",
+          lines = ['## OTA extraction', '', f"Extraction status: {run.get('status', 'not completed')}",
+                   f"GitLab publication: {os.environ.get('PUBLICATION_OUTCOME', 'not completed')}",
                    f"Build: {run.get('selected', {}).get('build', 'unavailable')}",
                    f"Source ZIP retained: {run.get('sourceZipRetained', 'extraction did not complete')}",
                    f"Selection counts: {audit.get('counts', {})}", '',
                    f"Package/file changes: {run.get('tracking', {}).get('counts', {})}",
                    f"Full extraction archived: {run.get('archiveCreated', False)}",
                    'When requested, the TAR.XZ extraction is retained for 3 days; reports for 7 days.',
-                   'Source and reports are persisted in the dated GitLab repository; package channels are unchanged.']
+                   'GitLab completion is recorded only after successful publication and requested Telegram delivery. Package channels are unchanged.']
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
               stream.write('\n'.join(lines) + '\n')
           PY
