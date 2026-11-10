@@ -22,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: stable-registry-${{ inputs.android_version }}
+  group: stable-registry-publication
   cancel-in-progress: false
 
 jobs:
@@ -30,27 +30,50 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+      G_TOKEN: ${{ secrets.G_TOKEN }}
+      GIT_TERMINAL_PROMPT: '0'
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: credential.helper
+      GIT_CONFIG_VALUE_0: ''
     steps:
       - uses: actions/checkout@v7
-
-      - name: Configure GitLab access
-        uses: webfactory/ssh-agent@v0.10.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Clone catalog
-        shell: bash
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
-          git clone git@gitlab.com:nikgapps/nikgapps-package-catalog.git catalog
-          git -C catalog config user.name 'NikGapps Registry Rollback'
-          git -C catalog config user.email 'actions@users.noreply.github.com'
 
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
+
+      - run: python -m pip install 'PyYAML~=6.0.3' 'python-dotenv~=1.2.4'
+
+      - name: Resolve reviewed release credential loader
+        id: engine
+        run: |
+          python - <<'PY'
+          import os, yaml
+          from pathlib import Path
+          workflow = yaml.load(Path('.github/workflows/NikGappsAndroid17Release.yml').read_text(), Loader=yaml.BaseLoader)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"commit={workflow['env']['RELEASE_COMMIT']}\n")
+          PY
+
+      - uses: actions/checkout@v7
+        with:
+          repository: nikhilmenghani/nikgapps-release
+          ref: ${{ steps.engine.outputs.commit }}
+          token: ${{ secrets.G_TOKEN }}
+          path: release-engine
+          persist-credentials: false
+
+      - name: Load GitLab access from myenv
+        run: |
+          python release-engine/scripts/environment.py
+          chmod +x "$GITHUB_WORKSPACE/release-engine/scripts/git_askpass.py"
+          echo "GIT_ASKPASS=$GITHUB_WORKSPACE/release-engine/scripts/git_askpass.py" >> "$GITHUB_ENV"
+
+      - name: Clone catalog
+        run: |
+          git clone https://gitlab.com/nikgapps/nikgapps-package-catalog.git catalog
+          git -C catalog config user.name 'NikGapps Registry Rollback'
+          git -C catalog config user.email 'actions@users.noreply.github.com'
 
       - name: Validate and optionally restore previous publication
         shell: bash

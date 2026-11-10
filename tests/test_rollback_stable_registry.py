@@ -39,7 +39,10 @@ class RollbackValidationTests(unittest.TestCase):
         subprocess.run(["git", "commit", "-qm", "old"], check=True)
         index = json.loads((self.root / "releases/index.json").read_text())
         index["latest"]["17"]["stable"]["arm64-v8a"] = "new"
+        index['releases'].append({'id': 'new', 'androidVersion': '17', 'channel': 'stable',
+            'architecture': 'arm64-v8a', 'manifest': 'releases/android-17/arm64-v8a/stable/new.json'})
         self.write("releases/index.json", index)
+        self.write('releases/android-17/arm64-v8a/stable/new.json', {'id': 'new', 'packages': {}})
         subprocess.run(["git", "add", "."], check=True)
         subprocess.run(["git", "commit", "-qm", "new"], check=True)
 
@@ -59,6 +62,22 @@ class RollbackValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not point"):
             rollback.validate_release(parent, "missing", "17", "stable", "arm64-v8a", "token")
         verify.assert_not_called()
+
+    def test_rollback_finds_publication_before_followup_download_metadata(self):
+        parent = rollback.git('rev-parse', 'HEAD^')
+        path = 'releases/android-17/arm64-v8a/stable/new.json'
+        self.write(path, {'id': 'new', 'packages': {}, 'sourceforge': {'status': 'published', 'files': []}})
+        subprocess.run(['git', 'add', '.'], check=True)
+        subprocess.run(['git', 'commit', '-qm', 'download metadata'], check=True)
+        selected, prior, restore, manifest = rollback.rollback_plan('HEAD', '17', 'stable', 'arm64-v8a', 'old')
+        self.assertEqual(('new', parent, ['releases/index.json'], path), (selected, prior, restore, manifest))
+
+    def test_rollback_rejects_unrelated_generated_metadata_changes_after_publication(self):
+        self.write('catalog.json', {'packages': []})
+        subprocess.run(['git', 'add', '.'], check=True)
+        subprocess.run(['git', 'commit', '-qm', 'unrelated catalog update'], check=True)
+        with self.assertRaisesRegex(ValueError, 'Other generated metadata'):
+            rollback.rollback_plan('HEAD', '17', 'stable', 'arm64-v8a', 'old')
 
 
 if __name__ == "__main__":

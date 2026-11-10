@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import subprocess
+from datetime import datetime, timezone
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -25,6 +26,35 @@ def pointer(index: dict, android: str, channel: str, arch: str) -> str | None:
 
 def generated_metadata_path(path: str) -> bool:
     return path in {"catalog.json", "appsets.json", "builder-assets.json", "config-templates.json"} or path.startswith("releases/")
+
+
+def rollback_plan(head: str, android: str, channel: str, arch: str, prior: str):
+    current = document(head, 'releases/index.json')
+    selected = pointer(current, android, channel, arch)
+    if not selected or selected == prior:
+        raise ValueError('No newer active release to roll back')
+    publication = git('log', '-1', '--format=%H', head, '--', 'releases/index.json')
+    parent = git('rev-parse', publication + '^')
+    previous = document(parent, 'releases/index.json')
+    if pointer(previous, android, channel, arch) != prior:
+        raise ValueError('Only the immediately preceding catalog publication can be rolled back')
+    expected = json.loads(json.dumps(current['latest']))
+    expected[android][channel][arch] = prior
+    if expected != previous['latest']:
+        raise ValueError('Rollback would affect another Android/channel/architecture pointer')
+    matches = [row for row in current['releases'] if row['id'] == selected]
+    if len(matches) != 1:
+        raise ValueError('Current registry manifest is absent or ambiguous')
+    manifest = matches[0]['manifest']
+    changed = set(git('diff', '--name-only', parent, publication).splitlines())
+    if not changed or any(not generated_metadata_path(path) for path in changed):
+        raise ValueError('Publication includes changes outside generated metadata')
+    later = set(git('diff', '--name-only', publication, head).splitlines())
+    if any(generated_metadata_path(path) and path != manifest for path in later):
+        raise ValueError('Other generated metadata changed after publication; refusing a broad rollback')
+    old_paths = set(git('ls-tree', '-r', '--name-only', parent).splitlines())
+    restore = sorted(changed & old_paths)
+    return selected, parent, restore, manifest
 
 
 def verify_url(url: str, token: str) -> None:
@@ -99,17 +129,8 @@ def main() -> int:
     if git("rev-parse", "HEAD") != git("rev-parse", "origin/main"):
         raise ValueError("Catalog checkout is no longer at origin/main")
     head = git("rev-parse", "HEAD")
-    parent = git("rev-parse", "HEAD^")
-    current = document(head, "releases/index.json")
-    previous = document(parent, "releases/index.json")
-    selected = pointer(current, args.android_version, args.channel, args.arch)
-    if not selected or selected == args.prior_release_id:
-        raise ValueError("No newer active release to roll back")
-    if pointer(previous, args.android_version, args.channel, args.arch) != args.prior_release_id:
-        raise ValueError("Only the immediately preceding catalog publication can be rolled back")
-    changed = set(git("diff", "--name-only", parent, head).splitlines())
-    if not changed or any(not generated_metadata_path(path) for path in changed):
-        raise ValueError("Latest commit includes changes outside generated catalog metadata")
+    selected, parent, restore, manifest = rollback_plan(head, args.android_version,
+        args.channel, args.arch, args.prior_release_id)
     count, checked = validate_release(parent, args.prior_release_id,
                                       args.android_version, args.channel, args.arch, token)
     print(f"Current: {selected}; rollback target: {args.prior_release_id}")
@@ -120,7 +141,17 @@ def main() -> int:
     git("fetch", "origin", "main")
     if git("rev-parse", "origin/main") != head:
         raise ValueError("Catalog changed during validation; refusing to push")
-    subprocess.run(["git", "revert", "--no-edit", head], check=True)
+    # Restore the coherent prior catalog, AppSets, assets, config and index.
+    # Keep the withdrawn manifest and immutable blobs for investigation.
+    subprocess.run(['git', 'restore', '--source', parent, '--', *restore], check=True)
+    withdrawn = document(head, manifest)
+    withdrawn['withdrawnAt'] = datetime.now(timezone.utc).isoformat()
+    withdrawn['withdrawalReason'] = 'Registry rollback to ' + args.prior_release_id
+    if 'sourceforge' in withdrawn:
+        withdrawn['sourceforge'].update(status='withdrawn', files=[])
+    Path(manifest).write_text(json.dumps(withdrawn, indent=2) + '\n', encoding='utf-8')
+    subprocess.run(['git', 'add', '--', *restore, manifest], check=True)
+    subprocess.run(['git', 'commit', '-m', f'Roll back Android {args.android_version} stable registry to {args.prior_release_id}'], check=True)
     subprocess.run(["git", "push", "origin", "HEAD:main"], check=True)
     print(f"Restored catalog metadata for {args.prior_release_id}.")
     return 0
