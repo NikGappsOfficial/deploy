@@ -34,7 +34,7 @@ concurrency:
 
 env:
   RELEASE_REPOSITORY: nikhilmenghani/nikgapps-release
-  RELEASE_COMMIT: d52d6c5dca0a470921b79c525f41d3fe3e4d4141
+  RELEASE_COMMIT: 5112f7377fd1fb2b3f0aeb7a8c0c2af2ee07a06a
   ANDROID_VERSION: '17'
   ENVIRONMENT_TYPE: production
   RELEASE_TYPE: stable
@@ -222,6 +222,7 @@ jobs:
             release/.work/production/*/registry/published-urls.json
             release/.work/production/*/registry/metadata/
             release/.work/production/*/download-metadata/
+            release/.work/production/*/github-mirror/mirror-receipt.json
             release/.work/local/*/registry/metadata/
             release/.work/core-smoke/report.json
             release/.work/tracker/release_tracker.json

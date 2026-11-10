@@ -325,3 +325,22 @@ overlay targetPackage with source evidence; shared XML changes unrelated to
 those entries remain in all-diffs only. Source-reference indexes are cached
 under `metadata/`, including the baseline snapshot, to avoid repeated full scans.
 Telegram links all views and attaches the focused relevant-diff HTML reports.
+
+
+## GitHub registry delivery
+
+`nikgapps/nikgapps-packages` serves verified individual registry packages, icons,
+config templates and builder assets. GitLab remains canonical; the Android app
+reads the generated GitHub snapshot using its own user's GitHub token.
+
+**Sync GitHub Registry Mirror** backfills or repairs the mirror without rebuilding
+or republishing a release. All mirrored bytes are checked against their source
+SHA-256 and size and GitHub's reported digest before one metadata commit switches
+the public snapshot. Existing objects are reused; historical versions remain.
+The workflow artifact contains only the mirror receipt.
+
+The existing `G_TOKEN` reads myenv; its `NIKGAPPS_GITHUB_TOKEN` field supplies the
+nikgapps-owner publisher credential. No additional repository secret is required.
+Stable publication and the full Android 17 release mirror automatically. Applied
+rollbacks and SourceForge-link sync also refresh GitHub under the shared
+`stable-registry-publication` lock. The app never receives this owner credential.

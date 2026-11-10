@@ -26,12 +26,42 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 360
     env:
       ANDROID_VERSION: ${{ inputs.android_version || '17' }}
       CATALOG_PROJECT: ${{ vars.GITLAB_CATALOG_PROJECT_ID || '85036487' }}
-      GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+      G_TOKEN: ${{ secrets.G_TOKEN }}
+      GIT_TERMINAL_PROMPT: '0'
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: credential.helper
+      GIT_CONFIG_VALUE_0: ''
     steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'PyYAML~=6.0.3' 'python-dotenv~=1.2.4'
+      - name: Resolve reviewed release credential loader
+        id: engine
+        run: |
+          python - <<'PY'
+          import os, yaml
+          from pathlib import Path
+          workflow = yaml.load(Path('.github/workflows/NikGappsAndroid17Release.yml').read_text(), Loader=yaml.BaseLoader)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"commit={workflow['env']['RELEASE_COMMIT']}\n")
+          PY
+      - uses: actions/checkout@v7
+        with:
+          repository: nikhilmenghani/nikgapps-release
+          ref: ${{ steps.engine.outputs.commit }}
+          token: ${{ secrets.G_TOKEN }}
+          path: release-engine
+          persist-credentials: false
+      - name: Load stable publication credentials from myenv
+        run: python release-engine/scripts/environment.py
       - name: Validate target and credentials
         shell: bash
         run: |
@@ -39,33 +69,18 @@ jobs:
             echo "Invalid Android version: $ANDROID_VERSION" >&2
             exit 1
           fi
-          if [[ -z "$GITLAB_TOKEN" ]]; then
-            echo "GITLAB_TOKEN is required" >&2
-            exit 1
-          fi
-
-      - name: Configure repository access
-        uses: webfactory/ssh-agent@v0.10.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Trust Git hosts and enable LFS
-        shell: bash
+          test -n "$GITLAB_TOKEN"
+          test -n "$PACKAGES_GITHUB_TOKEN"
+      - name: Configure HTTPS repository access and LFS
         run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan github.com gitlab.com >> ~/.ssh/known_hosts
+          chmod +x "$GITHUB_WORKSPACE/release-engine/scripts/git_askpass.py"
+          echo "GIT_ASKPASS=$GITHUB_WORKSPACE/release-engine/scripts/git_askpass.py" >> "$GITHUB_ENV"
           git lfs install
-
       - name: Clone project and stable sources
-        shell: bash
         run: |
-          git clone --depth=1 git@github.com:nikgapps/project.git project
-          git clone --depth=1 "git@gitlab.com:nikgapps/${ANDROID_VERSION}_stable.git" "${ANDROID_VERSION}_stable"
-          git clone --depth=1 "git@gitlab.com:nikgapps/overlays_${ANDROID_VERSION}.git" "overlays_${ANDROID_VERSION}"
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: '3.12'
+          git clone --depth=1 https://github.com/nikgapps/project.git project
+          git clone --depth=1 "https://gitlab.com/nikgapps/${ANDROID_VERSION}_stable.git" "${ANDROID_VERSION}_stable"
+          git clone --depth=1 "https://gitlab.com/nikgapps/overlays_${ANDROID_VERSION}.git" "overlays_${ANDROID_VERSION}"
 
       - name: Install publisher dependencies
         shell: bash
@@ -110,12 +125,17 @@ jobs:
             --builder-assets project/NikGapps/helper/assets \
             --verbose
 
+      - name: Mirror stable packages and metadata to GitHub
+        working-directory: release-engine
+        run: python -m scripts.github_mirror --builder ../project
+
       - name: Upload publication manifest
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: registry-publication-${{ env.ANDROID_VERSION }}
           path: |
+            release-engine/.work/github-mirror/mirror-receipt.json
             ${{ env.ANDROID_VERSION }}_REGISTRY_RELEASE/published-urls.json
             ${{ env.ANDROID_VERSION }}_REGISTRY_RELEASE/metadata/config-templates.json
             ${{ env.ANDROID_VERSION }}_REGISTRY_RELEASE/metadata/releases/index.json

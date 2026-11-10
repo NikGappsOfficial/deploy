@@ -42,7 +42,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - run: python -m pip install 'PyYAML~=6.0.3' 'python-dotenv~=1.2.4'
+      - run: python -m pip install 'PyYAML~=6.0.3' 'python-dotenv~=1.2.4' 'requests~=2.34.2'
 
       - name: Resolve reviewed release credential loader
         id: engine
@@ -85,3 +85,26 @@ jobs:
           args=(--repo catalog --android-version "$ANDROID_VERSION" --prior-release-id "$PRIOR_RELEASE_ID")
           if [[ "$APPLY" == 'true' ]]; then args+=(--apply); fi
           python rollback_stable_registry.py "${args[@]}"
+
+      - name: Resolve mirror implementation after an applied rollback
+        if: inputs.apply
+        id: mirror-builder
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          pin = json.loads(Path('release-engine/builder-pin.json').read_text())
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"commit={pin['commit']}\n")
+          PY
+      - uses: actions/checkout@v7
+        if: inputs.apply
+        with:
+          repository: nikgapps/project
+          ref: ${{ steps.mirror-builder.outputs.commit }}
+          path: release-engine/.engine
+          persist-credentials: false
+      - name: Mirror restored metadata to GitHub
+        if: inputs.apply
+        working-directory: release-engine
+        run: python -m scripts.github_mirror
