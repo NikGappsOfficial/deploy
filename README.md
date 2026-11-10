@@ -9,6 +9,13 @@ release, uploads them to SourceForge, records confirmed download links in GitLab
 metadata, and then updates the website changelog and
 release/config trackers. Caching and onDemand are not part of this flow.
 
+Enable **verify_only** to build and validate the full selection on Linux without
+publishing. Both modes first exercise real Core/CoreGo APKs through raw-source
+and local-registry assembly and compare their outputs. The gate verifies generated
+permission XML, package IDs, binary hashes, merged support, Go files and installer
+size accounting. The same SDK aapt2 inspects APKs during publication and final ZIP
+assembly; inspection failures cannot be converted into successful release ZIPs.
+
 **Android 17 release workflow checks** runs syntax/contract tests automatically.
 Run it manually to also verify the actual `G_TOKEN` private checkout, myenv import,
 GitHub publication permissions and GitLab source/catalog roles. This preflight

@@ -13,6 +13,11 @@ on:
         type: string
         default: core,corego,basic,omni,stock,full,go,addonsets,addons,removeotascripts,debloater
         required: true
+      verify_only:
+        description: Build and validate everything locally on the runner without publishing
+        type: boolean
+        default: false
+        required: true
 
 permissions:
   contents: read
@@ -24,7 +29,7 @@ concurrency:
 
 env:
   RELEASE_REPOSITORY: nikhilmenghani/nikgapps-release
-  RELEASE_COMMIT: 453972ac7f7f0106ba29f6483b8682060ee7d583
+  RELEASE_COMMIT: 46f68872a1a303b054c3b6eac07dc5eada6e679b
   ANDROID_VERSION: '17'
   ENVIRONMENT_TYPE: production
   RELEASE_TYPE: stable
@@ -147,6 +152,7 @@ jobs:
           echo "OVERLAYS_COMMIT=$(git -C .work/overlays_17 rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Prepare publication repositories
+        if: ${{ !inputs.verify_only }}
         working-directory: release
         run: |
           git clone --depth=1 https://github.com/nikgapps/tracker.git .work/tracker
@@ -159,7 +165,15 @@ jobs:
           test -x "$AAPT2"
           echo "aapt2=$AAPT2" >> "$GITHUB_OUTPUT"
 
+      - name: Verify real Core and CoreGo before publication
+        working-directory: release
+        run: |
+          python -m scripts.verify_core --source .work/17_stable --overlays .work/overlays_17 \
+            --builder .engine --changelog changelogs.yaml --work .work/core-smoke \
+            --aapt2 '${{ steps.tools.outputs.aapt2 }}'
+
       - name: Run registry-backed production release
+        if: ${{ !inputs.verify_only }}
         id: production
         working-directory: release
         env:
@@ -170,6 +184,17 @@ jobs:
             --package-source registry --changelog changelogs.yaml \
             --packages "$REQUESTED_PACKAGES" --stable-commit "$STABLE_COMMIT" \
             --aapt2 '${{ steps.tools.outputs.aapt2 }}'
+
+      - name: Build complete release without publishing
+        if: inputs.verify_only
+        id: verification
+        working-directory: release
+        env:
+          REQUESTED_PACKAGES: ${{ inputs.packages }}
+        run: |
+          python main.py --mode local --metadata-source preview --package-source registry \
+            --refresh-snapshot --no-compare --source .work/17_stable --overlays .work/overlays_17 \
+            --packages "$REQUESTED_PACKAGES" --aapt2 '${{ steps.tools.outputs.aapt2 }}'
 
       - name: Preserve metadata, checksums and publication receipts
         if: always()
@@ -187,6 +212,8 @@ jobs:
             release/.work/production/*/registry/published-urls.json
             release/.work/production/*/registry/metadata/
             release/.work/production/*/download-metadata/
+            release/.work/local/*/registry/metadata/
+            release/.work/core-smoke/report.json
             release/.work/tracker/release_tracker.json
             release/.work/tracker/config_version.json
             release/.work/website/_data/changelogs.yaml
@@ -197,12 +224,15 @@ jobs:
 
       - name: Summarize publication
         if: always()
+        env:
+          VERIFY_ONLY: ${{ inputs.verify_only }}
         run: |
           python - <<'PY'
           import json, os
           from pathlib import Path
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
-              summary.write('## Android 17 stable release\n\n')
+              title = 'Android 17 local verification (no publication)' if os.environ['VERIFY_ONLY'] == 'true' else 'Android 17 stable release'
+              summary.write('## ' + title + '\n\n')
               for label, key in [('Release engine/changelog', 'RELEASE_COMMIT'), ('Stable source', 'STABLE_COMMIT'), ('Overlays', 'OVERLAYS_COMMIT'), ('Builder', 'BUILDER_COMMIT')]:
                   summary.write(f"- {label}: `{os.environ.get(key, 'not resolved')}`\n")
               state_file = Path('release/.work/run-state.json')

@@ -45,8 +45,20 @@ class Android17ReleaseTests(unittest.TestCase):
         self.assertIn('--package-source registry', command['run'])
         self.assertIn('--changelog changelogs.yaml', command['run'])
         self.assertIn('--stable-commit "$STABLE_COMMIT"', command['run'])
-        self.assertNotIn('if', command)
+        self.assertEqual('${{ !inputs.verify_only }}', command['if'])
         self.assertEqual(1, sum('main.py --mode production' in step.get('run', '') for step in self.steps))
+
+    def test_real_apk_gate_precedes_publication_and_full_verification_cannot_publish(self):
+        smoke = next(i for i, step in enumerate(self.steps) if 'scripts.verify_core' in step.get('run', ''))
+        production = next(i for i, step in enumerate(self.steps) if step.get('id') == 'production')
+        self.assertLess(smoke, production)
+        self.assertNotIn('if', self.steps[smoke])
+        verification = next(s for s in self.steps if s.get('id') == 'verification')
+        self.assertEqual('inputs.verify_only', verification['if'])
+        self.assertIn('--mode local', verification['run'])
+        self.assertIn('--metadata-source preview', verification['run'])
+        self.assertIn('--package-source registry', verification['run'])
+        self.assertIn('--no-compare', verification['run'])
 
     def test_inline_python_parses(self):
         sync = yaml.load((ROOT / '.github/workflows/SyncSourceForgeMetadata.yml').read_text(), Loader=yaml.BaseLoader)
