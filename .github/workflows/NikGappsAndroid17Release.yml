@@ -29,7 +29,7 @@ concurrency:
 
 env:
   RELEASE_REPOSITORY: nikhilmenghani/nikgapps-release
-  RELEASE_COMMIT: 46f68872a1a303b054c3b6eac07dc5eada6e679b
+  RELEASE_COMMIT: 74f56b9b053e34bbf0c8c73c4e9f961ee3c33297
   ANDROID_VERSION: '17'
   ENVIRONMENT_TYPE: production
   RELEASE_TYPE: stable
