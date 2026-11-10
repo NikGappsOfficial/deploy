@@ -49,19 +49,29 @@ class Android17ReleaseTests(unittest.TestCase):
         self.assertEqual(1, sum('main.py --mode production' in step.get('run', '') for step in self.steps))
 
     def test_inline_python_parses(self):
-        for step in self.steps:
+        sync = yaml.load((ROOT / '.github/workflows/SyncSourceForgeMetadata.yml').read_text(), Loader=yaml.BaseLoader)
+        for step in self.steps + sync['jobs']['sync']['steps']:
             for code in re.findall("python - <<'PY'\n(.*?)\nPY", step.get('run', ''), re.DOTALL):
                 compile(code, step['name'], 'exec')
 
+    def test_artifacts_keep_receipts_and_metadata_without_duplicate_release_zips(self):
+        artifacts = next(step for step in self.steps if step.get('uses', '').startswith('actions/upload-artifact@'))
+        paths = artifacts['with']['path'].splitlines()
+        self.assertIn('release/dist/**/release-manifest.json', paths)
+        self.assertIn('release/.work/production/*/download-metadata/', paths)
+        self.assertIn('!release/**/*.zip', paths)
+        self.assertNotIn('release/dist/', paths)
+
     @unittest.skipUnless(BASH, 'Bash is unavailable')
     def test_shell_steps_parse(self):
+        sync = yaml.load((ROOT / '.github/workflows/SyncSourceForgeMetadata.yml').read_text(), Loader=yaml.BaseLoader)
         with tempfile.TemporaryDirectory() as temporary:
             script = Path(temporary) / 'step.sh'
-            for step in self.steps:
+            for step in self.steps + sync['jobs']['sync']['steps']:
                 if 'run' in step:
                     script.write_text(step['run'], encoding='utf-8', newline='\n')
                     result = subprocess.run([BASH, '-n', str(script)], capture_output=True, text=True)
-                    self.assertEqual(0, result.returncode, f"{step['name']}: {result.stderr}")
+                    self.assertEqual(0, result.returncode, f"{step.get('name', 'shell step')}: {result.stderr}")
 
 
 if __name__ == '__main__':

@@ -4,11 +4,13 @@ on:
     paths:
       - .github/workflows/NikGappsAndroid17Release.yml
       - .github/workflows/Android17ReleaseChecks.yml
+      - .github/workflows/SyncSourceForgeMetadata.yml
       - tests/test_android17_release.py
   pull_request:
     paths:
       - .github/workflows/NikGappsAndroid17Release.yml
       - .github/workflows/Android17ReleaseChecks.yml
+      - .github/workflows/SyncSourceForgeMetadata.yml
       - tests/test_android17_release.py
   workflow_dispatch:
 permissions:

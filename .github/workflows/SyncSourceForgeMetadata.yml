@@ -1,0 +1,88 @@
+name: Sync SourceForge Release Metadata
+on:
+  workflow_dispatch:
+    inputs:
+      release_date:
+        description: Published SourceForge release date (YYYY-MM-DD)
+        type: string
+        required: true
+      registry_release_id:
+        description: Exact registry release ID recorded in the SourceForge manifest
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: stable-registry-publication
+  cancel-in-progress: false
+env:
+  G_TOKEN: ${{ secrets.G_TOKEN }}
+  CATALOG_PROJECT: ${{ vars.GITLAB_CATALOG_PROJECT_ID || '85036487' }}
+  SF_USER: ${{ vars.SF_USER || 'nikhilmenghani' }}
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'PyYAML~=6.0.3' 'python-dotenv~=1.2.4' 'paramiko~=5.0.0'
+      - name: Resolve reviewed release engine
+        id: engine
+        run: |
+          python - <<'PY'
+          import os, yaml
+          from pathlib import Path
+          workflow = yaml.load(Path('.github/workflows/NikGappsAndroid17Release.yml').read_text(), Loader=yaml.BaseLoader)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"commit={workflow['env']['RELEASE_COMMIT']}\n")
+          PY
+      - uses: actions/checkout@v7
+        with:
+          repository: nikhilmenghani/nikgapps-release
+          ref: ${{ steps.engine.outputs.commit }}
+          token: ${{ secrets.G_TOKEN }}
+          path: release
+          persist-credentials: false
+      - name: Resolve reviewed builder
+        id: builder
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          pin = json.loads(Path('release/builder-pin.json').read_text())
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"commit={pin['commit']}\n")
+          PY
+      - uses: actions/checkout@v7
+        with:
+          repository: nikgapps/project
+          ref: ${{ steps.builder.outputs.commit }}
+          path: release/.engine
+          persist-credentials: false
+      - name: Load release environment from myenv
+        run: python release/scripts/environment.py
+      - name: Trust SourceForge
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+      - name: Verify existing uploads and publish their download links
+        working-directory: release
+        env:
+          RELEASE_DATE: ${{ inputs.release_date }}
+          REGISTRY_RELEASE_ID: ${{ inputs.registry_release_id }}
+        run: |
+          python -m scripts.sync_downloads --release-date "$RELEASE_DATE" \
+            --registry-release-id "$REGISTRY_RELEASE_ID"
+      - name: Preserve metadata and verification receipts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: sourceforge-download-metadata
+          path: release/.work/download-sync/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14

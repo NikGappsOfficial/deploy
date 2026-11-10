@@ -24,7 +24,7 @@ concurrency:
 
 env:
   RELEASE_REPOSITORY: nikhilmenghani/nikgapps-release
-  RELEASE_COMMIT: d7e1c129b96c126764db9f6a2bd770ec94781697
+  RELEASE_COMMIT: 453972ac7f7f0106ba29f6483b8682060ee7d583
   ANDROID_VERSION: '17'
   ENVIRONMENT_TYPE: production
   RELEASE_TYPE: stable
@@ -171,18 +171,26 @@ jobs:
             --packages "$REQUESTED_PACKAGES" --stable-commit "$STABLE_COMMIT" \
             --aapt2 '${{ steps.tools.outputs.aapt2 }}'
 
-      - name: Preserve ZIPs, registry snapshot and publication receipts
+      - name: Preserve metadata, checksums and publication receipts
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: android-17-stable-release
           path: |
-            release/dist/
+            release/dist/**/run-state.json
+            release/dist/**/latest.json
+            release/dist/**/release-manifest.json
+            release/dist/**/publication.json
+            release/dist/**/release-links.json
+            release/dist/**/SHA256SUMS
+            release/dist/**/nikgapps.config
             release/.work/production/*/registry/published-urls.json
             release/.work/production/*/registry/metadata/
+            release/.work/production/*/download-metadata/
             release/.work/tracker/release_tracker.json
             release/.work/tracker/config_version.json
             release/.work/website/_data/changelogs.yaml
+            !release/**/*.zip
           if-no-files-found: ignore
           include-hidden-files: true
           retention-days: 14

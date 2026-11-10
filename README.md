@@ -5,7 +5,8 @@
 Run **Actions → NikGapps Android 17 Release → Run workflow**. This manual workflow
 publishes Android 17 registry packages and app release metadata, builds signed
 Core/CoreGo and all other predefined packages/addons from that exact registry
-release, uploads them to SourceForge, and then updates the website changelog and
+release, uploads them to SourceForge, records confirmed download links in GitLab
+metadata, and then updates the website changelog and
 release/config trackers. Caching and onDemand are not part of this flow.
 
 **Android 17 release workflow checks** runs syntax/contract tests automatically.
@@ -36,6 +37,20 @@ The complete release and `PublishStableRegistry.yml` share the
 existing **NikGapps Release** workflow. Registry publication happens first; if a
 later upload fails, the app metadata may already be published. Check the Actions
 summary and retained receipts before retrying.
+
+Confirmed downloads are stored under `sourceforge` in the existing GitLab registry
+release manifest (`85036487`). The website follows the existing `releases/index.json`
+and reads `sourceforge.files`; no second website copy or download index is maintained.
+Entries contain published URLs, file sizes and hashes alongside the same app release.
+Future GitHub artifacts retain only metadata, config, checksums and receipts;
+release ZIPs are excluded because they are already stored on SourceForge.
+
+To backfill or retry download indexing for an existing upload, run **Sync
+SourceForge Release Metadata** with the ISO date and exact registry release ID.
+It verifies the existing manifest and all remote file sizes, publishes a derived
+SourceForge link snapshot, and updates the corresponding GitLab release manifest. It does not
+rebuild or republish ZIPs or app packages. A future removal workflow must withdraw
+the corresponding index entry; manual SourceForge deletion needs reconciliation.
 
 ## Manual OTA extraction with the private operations engine
 
