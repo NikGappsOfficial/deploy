@@ -12,7 +12,7 @@ on:
         description: Full tested and pushed overlays_17 commit SHA
         type: string
         required: true
-        default: 3038daccc306f598034969ea88e3f2ecfa730fcc
+        default: 42ae7e94ddf21a43d90088287a8451efd8d21d6a
       packages:
         description: Package groups to release
         type: string
@@ -34,7 +34,7 @@ concurrency:
 
 env:
   RELEASE_REPOSITORY: nikhilmenghani/nikgapps-release
-  RELEASE_COMMIT: 74f56b9b053e34bbf0c8c73c4e9f961ee3c33297
+  RELEASE_COMMIT: d52d6c5dca0a470921b79c525f41d3fe3e4d4141
   ANDROID_VERSION: '17'
   ENVIRONMENT_TYPE: production
   RELEASE_TYPE: stable
