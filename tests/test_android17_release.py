@@ -60,6 +60,14 @@ class Android17ReleaseTests(unittest.TestCase):
         self.assertIn('--package-source registry', verification['run'])
         self.assertIn('--no-compare', verification['run'])
 
+    def test_compiled_overlay_commit_is_pinned_like_stable_source(self):
+        inputs = self.workflow['on']['workflow_dispatch']['inputs']
+        self.assertRegex(inputs['overlays_commit']['default'], r'^[0-9a-f]{40}$')
+        step = next(s for s in self.steps if s.get('name') == 'Clone tested stable sources and compiled overlays')
+        self.assertEqual('${{ inputs.overlays_commit }}', step['env']['TESTED_OVERLAYS_COMMIT'])
+        self.assertIn('git -C .work/overlays_17 fetch --depth=1 origin "$TESTED_OVERLAYS_COMMIT"', step['run'])
+        self.assertIn('git -C .work/overlays_17 checkout --detach FETCH_HEAD', step['run'])
+
     def test_inline_python_parses(self):
         sync = yaml.load((ROOT / '.github/workflows/SyncSourceForgeMetadata.yml').read_text(), Loader=yaml.BaseLoader)
         for step in self.steps + sync['jobs']['sync']['steps']:
