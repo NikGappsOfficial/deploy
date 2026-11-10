@@ -1,5 +1,42 @@
 # NikGapps deployment pipeline
 
+## Android 17 complete stable release
+
+Run **Actions → NikGapps Android 17 Release → Run workflow**. This manual workflow
+publishes Android 17 registry packages and app release metadata, builds signed
+Core/CoreGo and all other predefined packages/addons from that exact registry
+release, uploads them to SourceForge, and then updates the website changelog and
+release/config trackers. Caching and onDemand are not part of this flow.
+
+**Android 17 release workflow checks** runs syntax/contract tests automatically.
+Run it manually to also verify the actual `G_TOKEN` private checkout, myenv import,
+GitHub publication permissions and GitLab source/catalog roles. This preflight
+does not upload packages, change metadata, log in to SourceForge or push files.
+
+The code and changelog are maintained in the private
+[`nikhilmenghani/nikgapps-release`](https://github.com/nikhilmenghani/nikgapps-release)
+repository. Edit its **`changelogs.yaml`**, commit and push, then update
+`RELEASE_COMMIT` in `.github/workflows/NikGappsAndroid17Release.yml` to that accepted
+revision. The workflow reads its builder pin directly from `builder-pin.json`.
+Use the full tested/pushed `17_stable` SHA as the `stable_commit` input. The initial
+shared-Core SHA is `ae4bef228debce1be3f980b9bcbbcd3ab29e572b`; it includes the
+known-working WebView 134 set, not uncommitted local WebView 145 files.
+
+Only deploy's existing **`G_TOKEN`** secret is required. It checks out the private
+release code, reads `nikhilmenghani/myenv/.env` as data, and authenticates GitHub
+tracker/website pushes. The loader maps `NIKGAPPS_GITLAB_TOKEN` to `GITLAB_TOKEN`
+and `USER_EMAIL` to `EMAIL`, and imports `SF_PWD` and `USER_NAME`. It masks
+credentials, disables interpolation, and never executes myenv code. GitLab
+source clones and GitHub pushes use HTTPS askpass with host-specific credentials;
+no SSH private key or duplicated release-repository secrets are needed. Optional
+variables are `GITLAB_CATALOG_PROJECT_ID` and `SF_USER`.
+
+The complete release and `PublishStableRegistry.yml` share the
+`stable-registry-publication` lock. Other Android versions continue using the
+existing **NikGapps Release** workflow. Registry publication happens first; if a
+later upload fails, the app metadata may already be published. Check the Actions
+summary and retained receipts before retrying.
+
 ## Manual OTA extraction with the private operations engine
 
 Run **Actions → NikGapps OTA Extraction → Run workflow**. Defaults are Android

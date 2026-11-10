@@ -1,0 +1,207 @@
+name: NikGapps Android 17 Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      stable_commit:
+        description: Full tested and pushed 17_stable commit SHA
+        type: string
+        required: true
+        default: ae4bef228debce1be3f980b9bcbbcd3ab29e572b
+      packages:
+        description: Package groups to release
+        type: string
+        default: core,corego,basic,omni,stock,full,go,addonsets,addons,removeotascripts,debloater
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  # Share the lock with PublishStableRegistry: all versions write shared metadata.
+  group: stable-registry-publication
+  cancel-in-progress: false
+
+env:
+  RELEASE_REPOSITORY: nikhilmenghani/nikgapps-release
+  RELEASE_COMMIT: d7e1c129b96c126764db9f6a2bd770ec94781697
+  ANDROID_VERSION: '17'
+  ENVIRONMENT_TYPE: production
+  RELEASE_TYPE: stable
+  PACKAGE_SOURCE: registry
+  PACKAGE_CHANNEL: stable
+  G_TOKEN: ${{ secrets.G_TOKEN }}
+  CATALOG_PROJECT: ${{ vars.GITLAB_CATALOG_PROJECT_ID || '85036487' }}
+  SF_USER: ${{ vars.SF_USER || 'nikhilmenghani' }}
+  GIT_TERMINAL_PROMPT: '0'
+  GIT_CONFIG_COUNT: '1'
+  GIT_CONFIG_KEY_0: credential.helper
+  GIT_CONFIG_VALUE_0: ''
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check GitHub bootstrap credential
+        run: |
+          if [ -z "$G_TOKEN" ]; then
+            echo '::error::G_TOKEN must read nikgapps-release and myenv and push the tracker and website.'
+            exit 1
+          fi
+
+      - name: Check out tested release engine
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ env.RELEASE_REPOSITORY }}
+          ref: ${{ env.RELEASE_COMMIT }}
+          token: ${{ secrets.G_TOKEN }}
+          path: release
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Validate release selection and resolve builder pin
+        id: builder
+        env:
+          REQUESTED_PACKAGES: ${{ inputs.packages }}
+          TESTED_STABLE_COMMIT: ${{ inputs.stable_commit }}
+        run: |
+          python - <<'PY'
+          import json, os, re, sys
+          from pathlib import Path
+          sys.path.insert(0, 'release')
+          from scripts.release import selected_groups
+          selected_groups(os.environ['REQUESTED_PACKAGES'])
+          if not re.fullmatch('[0-9a-fA-F]{40}', os.environ['TESTED_STABLE_COMMIT']):
+              raise SystemExit('stable_commit must be a full commit SHA')
+          pin = json.loads(Path('release/builder-pin.json').read_text())
+          if pin['repository'] != 'nikgapps/project' or not re.fullmatch('[0-9a-f]{40}', pin['commit']):
+              raise SystemExit('Invalid reviewed builder pin')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"commit={pin['commit']}\n")
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write(f"BUILDER_COMMIT={pin['commit']}\n")
+          PY
+
+      - name: Check out reviewed builder
+        uses: actions/checkout@v7
+        with:
+          repository: nikgapps/project
+          ref: ${{ steps.builder.outputs.commit }}
+          path: release/.engine
+          persist-credentials: false
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install release dependencies and verify tooling
+        working-directory: release
+        run: |
+          python -m pip install ./.engine 'nikassets==0.17'
+          python -m unittest discover -s tests -v
+          python -m unittest discover -s .engine/tests_registry -v
+
+      - name: Load release environment from myenv
+        run: python release/scripts/environment.py
+
+      - name: Verify publication permissions without publishing
+        run: python release/scripts/check_access.py
+
+      - name: Configure HTTPS Git authentication and commit identity
+        run: |
+          chmod +x "$GITHUB_WORKSPACE/release/scripts/git_askpass.py"
+          echo "GIT_ASKPASS=$GITHUB_WORKSPACE/release/scripts/git_askpass.py" >> "$GITHUB_ENV"
+          git config --global user.name "$USER_NAME"
+          git config --global user.email "$EMAIL"
+          mkdir -p ~/.ssh
+          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+          git lfs install
+
+      - name: Make room for full release artifacts
+        run: |
+          # Unused SDKs on this disposable runner; keep Android build-tools.
+          sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/powershell /usr/local/lib/android/sdk/ndk
+          df -h .
+
+      - name: Clone tested stable sources and compiled overlays
+        working-directory: release
+        env:
+          TESTED_STABLE_COMMIT: ${{ inputs.stable_commit }}
+        run: |
+          mkdir -p .work
+          GIT_LFS_SKIP_SMUDGE=1 git clone --depth=1 https://gitlab.com/nikgapps/17_stable.git .work/17_stable
+          git -C .work/17_stable fetch --depth=1 origin "$TESTED_STABLE_COMMIT"
+          GIT_LFS_SKIP_SMUDGE=1 git -C .work/17_stable checkout --detach FETCH_HEAD
+          GIT_LFS_SKIP_SMUDGE=1 git clone --depth=1 https://gitlab.com/nikgapps/overlays_17.git .work/overlays_17
+          git -C .work/17_stable lfs pull
+          git -C .work/overlays_17 lfs pull
+          echo "STABLE_COMMIT=$(git -C .work/17_stable rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "OVERLAYS_COMMIT=$(git -C .work/overlays_17 rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Prepare publication repositories
+        working-directory: release
+        run: |
+          git clone --depth=1 https://github.com/nikgapps/tracker.git .work/tracker
+          git clone --depth=1 https://github.com/nikgapps/nikgapps.github.io.git .work/website
+
+      - name: Locate Android build tools
+        id: tools
+        run: |
+          AAPT2="$(find "$ANDROID_HOME/build-tools" -type f -name aapt2 | sort -V | tail -n 1)"
+          test -x "$AAPT2"
+          echo "aapt2=$AAPT2" >> "$GITHUB_OUTPUT"
+
+      - name: Run registry-backed production release
+        id: production
+        working-directory: release
+        env:
+          REQUESTED_PACKAGES: ${{ inputs.packages }}
+        run: |
+          python main.py --mode production \
+            --source .work/17_stable --overlays .work/overlays_17 \
+            --package-source registry --changelog changelogs.yaml \
+            --packages "$REQUESTED_PACKAGES" --stable-commit "$STABLE_COMMIT" \
+            --aapt2 '${{ steps.tools.outputs.aapt2 }}'
+
+      - name: Preserve ZIPs, registry snapshot and publication receipts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: android-17-stable-release
+          path: |
+            release/dist/
+            release/.work/production/*/registry/published-urls.json
+            release/.work/production/*/registry/metadata/
+            release/.work/tracker/release_tracker.json
+            release/.work/tracker/config_version.json
+            release/.work/website/_data/changelogs.yaml
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 14
+
+      - name: Summarize publication
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('## Android 17 stable release\n\n')
+              for label, key in [('Release engine/changelog', 'RELEASE_COMMIT'), ('Stable source', 'STABLE_COMMIT'), ('Overlays', 'OVERLAYS_COMMIT'), ('Builder', 'BUILDER_COMMIT')]:
+                  summary.write(f"- {label}: `{os.environ.get(key, 'not resolved')}`\n")
+              state_file = Path('release/.work/run-state.json')
+              if state_file.exists():
+                  state = json.loads(state_file.read_text())
+                  for key in ('registryReleaseId', 'configVersion', 'packageSource'):
+                      summary.write(f"- {key}: `{state.get(key, 'not resolved')}`\n")
+                  for stage, status in state['stages'].items():
+                      summary.write(f'- {stage}: {status}\n')
+          PY

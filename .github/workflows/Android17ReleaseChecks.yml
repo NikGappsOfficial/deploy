@@ -1,0 +1,64 @@
+name: Android 17 release workflow checks
+on:
+  push:
+    paths:
+      - .github/workflows/NikGappsAndroid17Release.yml
+      - .github/workflows/Android17ReleaseChecks.yml
+      - tests/test_android17_release.py
+  pull_request:
+    paths:
+      - .github/workflows/NikGappsAndroid17Release.yml
+      - .github/workflows/Android17ReleaseChecks.yml
+      - tests/test_android17_release.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'PyYAML~=6.0.3'
+      - run: python -m unittest discover -s tests -p test_android17_release.py -v
+
+  access:
+    # Explicit verification only; pull requests never receive production secrets.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      G_TOKEN: ${{ secrets.G_TOKEN }}
+      CATALOG_PROJECT: ${{ vars.GITLAB_CATALOG_PROJECT_ID || '85036487' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'PyYAML~=6.0.3' 'python-dotenv~=1.2.4'
+      - name: Resolve reviewed release engine
+        id: engine
+        run: |
+          python - <<'PY'
+          import os, yaml
+          from pathlib import Path
+          document = yaml.load(Path('.github/workflows/NikGappsAndroid17Release.yml').read_text(), Loader=yaml.BaseLoader)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"commit={document['env']['RELEASE_COMMIT']}\n")
+          PY
+      - uses: actions/checkout@v7
+        with:
+          repository: nikhilmenghani/nikgapps-release
+          ref: ${{ steps.engine.outputs.commit }}
+          token: ${{ secrets.G_TOKEN }}
+          path: release
+          persist-credentials: false
+      - name: Load release credentials from myenv
+        run: python release/scripts/environment.py
+      - name: Check release permissions without publishing
+        run: python release/scripts/check_access.py
