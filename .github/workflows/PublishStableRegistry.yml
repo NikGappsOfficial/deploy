@@ -109,6 +109,10 @@ jobs:
         run: python -m unittest discover -s tests_registry -v
         working-directory: project
 
+      - name: Verify GitHub mirror access before canonical publication
+        working-directory: release-engine
+        run: python -m scripts.github_mirror --builder ../project --check-access
+
       - name: Publish stable packages and automatic config revisions
         shell: bash
         run: |

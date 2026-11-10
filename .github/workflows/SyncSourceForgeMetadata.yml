@@ -69,6 +69,9 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+      - name: Verify GitHub mirror access before metadata updates
+        working-directory: release
+        run: python -m scripts.github_mirror --check-access
       - name: Verify existing uploads and publish their download links
         working-directory: release
         env:
