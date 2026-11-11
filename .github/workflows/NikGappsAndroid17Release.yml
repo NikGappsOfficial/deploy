@@ -12,7 +12,7 @@ on:
         description: Full tested and pushed overlays_17 commit SHA
         type: string
         required: true
-        default: 42ae7e94ddf21a43d90088287a8451efd8d21d6a
+        default: da1327fa56cd26b2aaf731ccc4e7558f2dd2a610
       packages:
         description: Package groups to release
         type: string
@@ -34,7 +34,7 @@ concurrency:
 
 env:
   RELEASE_REPOSITORY: nikhilmenghani/nikgapps-release
-  RELEASE_COMMIT: cad5fa5d850496e024b3d3ca1c936c81f93eb714
+  RELEASE_COMMIT: ea8bc8cd08d98fb3f2186028768be49ee9bb246b
   ANDROID_VERSION: '17'
   ENVIRONMENT_TYPE: production
   RELEASE_TYPE: stable
@@ -171,9 +171,20 @@ jobs:
       - name: Locate Android build tools
         id: tools
         run: |
+          sdkmanager 'platforms;android-37.0'
           AAPT2="$(find "$ANDROID_HOME/build-tools" -type f -name aapt2 | sort -V | tail -n 1)"
           test -x "$AAPT2"
           echo "aapt2=$AAPT2" >> "$GITHUB_OUTPUT"
+          echo "$(dirname "$AAPT2")" >> "$GITHUB_PATH"
+
+      - name: Rebuild and verify every PixelLauncher overlay target
+        working-directory: release
+        env:
+          AAPT2: ${{ steps.tools.outputs.aapt2 }}
+        run: |
+          python -m NikGapps.overlay_control --android-version 17 \
+            --overlay PixelLauncherOverlay --source-dir .work/overlay-rebuild/source \
+            --output-dir .work/overlay-rebuild/compiled --verify-against .work/overlays_17
 
       - name: Verify real Core and CoreGo before publication
         working-directory: release
