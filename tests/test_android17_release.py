@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -25,7 +26,32 @@ class Android17ReleaseTests(unittest.TestCase):
         old = yaml.load((ROOT / '.github/workflows/PublishStableRegistry.yml').read_text(), Loader=yaml.BaseLoader)
         self.assertEqual(old['concurrency']['group'], self.workflow['concurrency']['group'])
         self.assertIn('corego', self.workflow['on']['workflow_dispatch']['inputs']['packages']['default'].split(','))
-        self.assertRegex(self.workflow['env']['RELEASE_COMMIT'], r'^[0-9a-f]{40}$')
+        self.assertEqual('main', self.workflow['env']['RELEASE_REF'])
+        self.assertNotIn('RELEASE_COMMIT', self.workflow['env'])
+
+    def test_release_engine_uses_latest_branch_and_records_resolved_commit(self):
+        checkout = next(s for s in self.steps if s.get('name') == 'Check out latest release engine')
+        self.assertEqual('${{ env.RELEASE_REF }}', checkout['with']['ref'])
+        record = next(i for i, s in enumerate(self.steps) if s.get('name') == 'Record resolved release engine commit')
+        self.assertIn('git -C release rev-parse HEAD', self.steps[record]['run'])
+        self.assertIn('RELEASE_COMMIT=', self.steps[record]['run'])
+        builder = next(i for i, s in enumerate(self.steps) if s.get('id') == 'builder')
+        self.assertLess(record, builder)
+
+    def test_dependent_workflows_resolve_the_same_release_branch(self):
+        for name in ('Android17ReleaseChecks', 'SyncGitHubRegistryMirror', 'SyncSourceForgeMetadata',
+                     'PublishStableRegistry', 'RollbackStableRegistry'):
+            workflow = yaml.load((ROOT / f'.github/workflows/{name}.yml').read_text(), Loader=yaml.BaseLoader)
+            steps = [step for job in workflow['jobs'].values() for step in job['steps']]
+            resolver = next(s for s in steps if s.get('id') == 'engine')
+            code = re.search("python - <<'PY'\n(.*?)\nPY", resolver['run'], re.DOTALL).group(1)
+            checkout = next(s for s in steps if s.get('with', {}).get('repository') == 'nikhilmenghani/nikgapps-release')
+            self.assertEqual('${{ steps.engine.outputs.ref }}', checkout['with']['ref'])
+            with tempfile.TemporaryDirectory() as temporary:
+                output = Path(temporary) / 'output'
+                subprocess.run([sys.executable, '-c', code], cwd=ROOT,
+                    env={**os.environ, 'GITHUB_OUTPUT': str(output)}, check=True, capture_output=True)
+                self.assertEqual('ref=main', output.read_text().strip(), name)
 
     def test_myenv_bootstrap_precedes_git_and_publication(self):
         self.assertEqual('${{ secrets.G_TOKEN }}', self.workflow['env']['G_TOKEN'])
@@ -35,7 +61,7 @@ class Android17ReleaseTests(unittest.TestCase):
         loader = next(i for i, step in enumerate(self.steps) if 'scripts/environment.py' in step.get('run', ''))
         clones = next(i for i, step in enumerate(self.steps) if step.get('name') == 'Clone tested stable and overlay sources')
         self.assertLess(loader, clones)
-        self.assertEqual('false', next(s['with']['persist-credentials'] for s in self.steps if s.get('name') == 'Check out tested release engine'))
+        self.assertEqual('false', next(s['with']['persist-credentials'] for s in self.steps if s.get('name') == 'Check out latest release engine'))
         self.assertNotIn('git@', serialized)
         self.assertNotIn('https://$', serialized)
 

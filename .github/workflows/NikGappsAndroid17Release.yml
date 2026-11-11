@@ -34,7 +34,7 @@ concurrency:
 
 env:
   RELEASE_REPOSITORY: nikhilmenghani/nikgapps-release
-  RELEASE_COMMIT: 8072dff867eb68694310d51ece7488d14c4d955d
+  RELEASE_REF: main
   ANDROID_VERSION: '17'
   ENVIRONMENT_TYPE: production
   RELEASE_TYPE: stable
@@ -63,14 +63,17 @@ jobs:
             exit 1
           fi
 
-      - name: Check out tested release engine
+      - name: Check out latest release engine
         uses: actions/checkout@v7
         with:
           repository: ${{ env.RELEASE_REPOSITORY }}
-          ref: ${{ env.RELEASE_COMMIT }}
+          ref: ${{ env.RELEASE_REF }}
           token: ${{ secrets.G_TOKEN }}
           path: release
           persist-credentials: false
+
+      - name: Record resolved release engine commit
+        run: echo "RELEASE_COMMIT=$(git -C release rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - uses: actions/setup-python@v7
         with:

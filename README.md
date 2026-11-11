@@ -24,9 +24,10 @@ does not upload packages, change metadata, log in to SourceForge or push files.
 
 The code and changelog are maintained in the private
 [`nikhilmenghani/nikgapps-release`](https://github.com/nikhilmenghani/nikgapps-release)
-repository. Edit its **`changelogs.yaml`**, commit and push, then update
-`RELEASE_COMMIT` in `.github/workflows/NikGappsAndroid17Release.yml` to that accepted
-revision. The workflow reads its builder pin directly from `builder-pin.json`.
+repository. Edit its **`changelogs.yaml`**, commit and push to `main`. The workflow
+automatically checks out the latest `main` using `RELEASE_REF`; no release SHA
+update in deploy is needed. It records the resolved commit in the Actions summary
+and reads the builder pin directly from that checkout's `builder-pin.json`.
 Use the full tested/pushed `17_stable` SHA as `stable_commit` and the tested/pushed
 `overlays_17_source` SHA as `overlay_source_commit`. The source checkout is copied
 into the run workspace and compiled with the pinned official apktool (currently
