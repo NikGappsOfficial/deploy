@@ -33,7 +33,7 @@ class Android17ReleaseTests(unittest.TestCase):
         for name in ('SSH_PRIVATE_KEY', 'SF_PWD', 'GITLAB_TOKEN'):
             self.assertNotIn('secrets.' + name, serialized)
         loader = next(i for i, step in enumerate(self.steps) if 'scripts/environment.py' in step.get('run', ''))
-        clones = next(i for i, step in enumerate(self.steps) if step.get('name') == 'Clone tested stable sources and compiled overlays')
+        clones = next(i for i, step in enumerate(self.steps) if step.get('name') == 'Clone tested stable and overlay sources')
         self.assertLess(loader, clones)
         self.assertEqual('false', next(s['with']['persist-credentials'] for s in self.steps if s.get('name') == 'Check out tested release engine'))
         self.assertNotIn('git@', serialized)
@@ -49,24 +49,31 @@ class Android17ReleaseTests(unittest.TestCase):
         self.assertEqual(1, sum('main.py --mode production' in step.get('run', '') for step in self.steps))
 
     def test_real_apk_gate_precedes_publication_and_full_verification_cannot_publish(self):
-        smoke = next(i for i, step in enumerate(self.steps) if 'scripts.verify_core' in step.get('run', ''))
-        production = next(i for i, step in enumerate(self.steps) if step.get('id') == 'production')
-        self.assertLess(smoke, production)
-        self.assertNotIn('if', self.steps[smoke])
+        # The shared engine now builds overlays and runs the real-APK gate before its registry stage.
+        production = next(s for s in self.steps if s.get('id') == 'production')
+        self.assertIn('--verify-core', production['run'])
+        self.assertIn('--overlay-source .work/overlays_17_source', production['run'])
+        self.assertIn('--overlay-source-commit "$OVERLAY_SOURCE_COMMIT"', production['run'])
         verification = next(s for s in self.steps if s.get('id') == 'verification')
         self.assertEqual('inputs.verify_only', verification['if'])
         self.assertIn('--mode local', verification['run'])
         self.assertIn('--metadata-source preview', verification['run'])
         self.assertIn('--package-source registry', verification['run'])
         self.assertIn('--no-compare', verification['run'])
+        self.assertIn('--verify-core', verification['run'])
+        self.assertIn('--overlay-source .work/overlays_17_source', verification['run'])
+        self.assertNotIn('NikGapps.overlay_control', json.dumps(self.steps))
 
-    def test_compiled_overlay_commit_is_pinned_like_stable_source(self):
+    def test_overlay_source_commit_is_pinned_like_stable_source(self):
         inputs = self.workflow['on']['workflow_dispatch']['inputs']
-        self.assertRegex(inputs['overlays_commit']['default'], r'^[0-9a-f]{40}$')
-        step = next(s for s in self.steps if s.get('name') == 'Clone tested stable sources and compiled overlays')
-        self.assertEqual('${{ inputs.overlays_commit }}', step['env']['TESTED_OVERLAYS_COMMIT'])
-        self.assertIn('git -C .work/overlays_17 fetch --depth=1 origin "$TESTED_OVERLAYS_COMMIT"', step['run'])
-        self.assertIn('git -C .work/overlays_17 checkout --detach FETCH_HEAD', step['run'])
+        self.assertRegex(inputs['overlay_source_commit']['default'], r'^[0-9a-f]{40}$')
+        self.assertNotIn('overlays_commit', inputs)
+        step = next(s for s in self.steps if s.get('name') == 'Clone tested stable and overlay sources')
+        self.assertEqual('${{ inputs.overlay_source_commit }}', step['env']['TESTED_OVERLAY_SOURCE_COMMIT'])
+        self.assertIn('https://gitlab.com/nikgapps/overlays_17_source.git', step['run'])
+        self.assertIn('git -C .work/overlays_17_source fetch --depth=1 origin "$TESTED_OVERLAY_SOURCE_COMMIT"', step['run'])
+        self.assertIn('git -C .work/overlays_17_source checkout --detach FETCH_HEAD', step['run'])
+        self.assertNotIn('https://gitlab.com/nikgapps/overlays_17.git', step['run'])
 
     def test_inline_python_parses(self):
         sync = yaml.load((ROOT / '.github/workflows/SyncSourceForgeMetadata.yml').read_text(), Loader=yaml.BaseLoader)
@@ -81,6 +88,7 @@ class Android17ReleaseTests(unittest.TestCase):
         self.assertIn('release/.work/production/*/download-metadata/', paths)
         self.assertIn('!release/**/*.zip', paths)
         self.assertNotIn('release/dist/', paths)
+        self.assertEqual('${{ always() && !inputs.verify_only }}', artifacts['if'])
 
     @unittest.skipUnless(BASH, 'Bash is unavailable')
     def test_shell_steps_parse(self):

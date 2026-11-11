@@ -8,11 +8,11 @@ on:
         type: string
         required: true
         default: ae4bef228debce1be3f980b9bcbbcd3ab29e572b
-      overlays_commit:
-        description: Full tested and pushed overlays_17 commit SHA
+      overlay_source_commit:
+        description: Full tested and pushed overlays_17_source commit SHA
         type: string
         required: true
-        default: da1327fa56cd26b2aaf731ccc4e7558f2dd2a610
+        default: dff9aa846135968fce3f82c8fb8dabe2dd0185e0
       packages:
         description: Package groups to release
         type: string
@@ -34,7 +34,7 @@ concurrency:
 
 env:
   RELEASE_REPOSITORY: nikhilmenghani/nikgapps-release
-  RELEASE_COMMIT: ea8bc8cd08d98fb3f2186028768be49ee9bb246b
+  RELEASE_COMMIT: 187117fc7eb429e8bf9b33881ad8a55d3660952f
   ANDROID_VERSION: '17'
   ENVIRONMENT_TYPE: production
   RELEASE_TYPE: stable
@@ -81,7 +81,7 @@ jobs:
         env:
           REQUESTED_PACKAGES: ${{ inputs.packages }}
           TESTED_STABLE_COMMIT: ${{ inputs.stable_commit }}
-          TESTED_OVERLAYS_COMMIT: ${{ inputs.overlays_commit }}
+          TESTED_OVERLAY_SOURCE_COMMIT: ${{ inputs.overlay_source_commit }}
         run: |
           python - <<'PY'
           import json, os, re, sys
@@ -89,7 +89,7 @@ jobs:
           sys.path.insert(0, 'release')
           from scripts.release import selected_groups
           selected_groups(os.environ['REQUESTED_PACKAGES'])
-          for key in ('TESTED_STABLE_COMMIT', 'TESTED_OVERLAYS_COMMIT'):
+          for key in ('TESTED_STABLE_COMMIT', 'TESTED_OVERLAY_SOURCE_COMMIT'):
               if not re.fullmatch('[0-9a-fA-F]{40}', os.environ[key]):
                   raise SystemExit(key + ' must be a full commit SHA')
           pin = json.loads(Path('release/builder-pin.json').read_text())
@@ -143,23 +143,23 @@ jobs:
           sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/powershell /usr/local/lib/android/sdk/ndk
           df -h .
 
-      - name: Clone tested stable sources and compiled overlays
+      - name: Clone tested stable and overlay sources
         working-directory: release
         env:
           TESTED_STABLE_COMMIT: ${{ inputs.stable_commit }}
-          TESTED_OVERLAYS_COMMIT: ${{ inputs.overlays_commit }}
+          TESTED_OVERLAY_SOURCE_COMMIT: ${{ inputs.overlay_source_commit }}
         run: |
           mkdir -p .work
           GIT_LFS_SKIP_SMUDGE=1 git clone --depth=1 https://gitlab.com/nikgapps/17_stable.git .work/17_stable
           git -C .work/17_stable fetch --depth=1 origin "$TESTED_STABLE_COMMIT"
           GIT_LFS_SKIP_SMUDGE=1 git -C .work/17_stable checkout --detach FETCH_HEAD
-          GIT_LFS_SKIP_SMUDGE=1 git clone --depth=1 https://gitlab.com/nikgapps/overlays_17.git .work/overlays_17
-          git -C .work/overlays_17 fetch --depth=1 origin "$TESTED_OVERLAYS_COMMIT"
-          GIT_LFS_SKIP_SMUDGE=1 git -C .work/overlays_17 checkout --detach FETCH_HEAD
+          GIT_LFS_SKIP_SMUDGE=1 git clone --depth=1 https://gitlab.com/nikgapps/overlays_17_source.git .work/overlays_17_source
+          git -C .work/overlays_17_source fetch --depth=1 origin "$TESTED_OVERLAY_SOURCE_COMMIT"
+          GIT_LFS_SKIP_SMUDGE=1 git -C .work/overlays_17_source checkout --detach FETCH_HEAD
           git -C .work/17_stable lfs pull
-          git -C .work/overlays_17 lfs pull
+          git -C .work/overlays_17_source lfs pull
           echo "STABLE_COMMIT=$(git -C .work/17_stable rev-parse HEAD)" >> "$GITHUB_ENV"
-          echo "OVERLAYS_COMMIT=$(git -C .work/overlays_17 rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "OVERLAY_SOURCE_COMMIT=$(git -C .work/overlays_17_source rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Prepare publication repositories
         if: ${{ !inputs.verify_only }}
@@ -177,21 +177,9 @@ jobs:
           echo "aapt2=$AAPT2" >> "$GITHUB_OUTPUT"
           echo "$(dirname "$AAPT2")" >> "$GITHUB_PATH"
 
-      - name: Rebuild and verify every PixelLauncher overlay target
+      - name: Prepare pinned overlay toolchain
         working-directory: release
-        env:
-          AAPT2: ${{ steps.tools.outputs.aapt2 }}
-        run: |
-          python -m NikGapps.overlay_control --android-version 17 \
-            --overlay PixelLauncherOverlay --source-dir .work/overlay-rebuild/source \
-            --output-dir .work/overlay-rebuild/compiled --verify-against .work/overlays_17
-
-      - name: Verify real Core and CoreGo before publication
-        working-directory: release
-        run: |
-          python -m scripts.verify_core --source .work/17_stable --overlays .work/overlays_17 \
-            --builder .engine --changelog changelogs.yaml --work .work/core-smoke \
-            --aapt2 '${{ steps.tools.outputs.aapt2 }}'
+        run: python -m scripts.overlay_toolchain
 
       - name: Run registry-backed production release
         if: ${{ !inputs.verify_only }}
@@ -201,7 +189,8 @@ jobs:
           REQUESTED_PACKAGES: ${{ inputs.packages }}
         run: |
           python main.py --mode production \
-            --source .work/17_stable --overlays .work/overlays_17 \
+            --source .work/17_stable --overlay-source .work/overlays_17_source \
+            --overlay-source-commit "$OVERLAY_SOURCE_COMMIT" --verify-core \
             --package-source registry --changelog changelogs.yaml \
             --packages "$REQUESTED_PACKAGES" --stable-commit "$STABLE_COMMIT" \
             --aapt2 '${{ steps.tools.outputs.aapt2 }}'
@@ -214,11 +203,12 @@ jobs:
           REQUESTED_PACKAGES: ${{ inputs.packages }}
         run: |
           python main.py --mode local --metadata-source preview --package-source registry \
-            --refresh-snapshot --no-compare --source .work/17_stable --overlays .work/overlays_17 \
+            --refresh-snapshot --no-compare --source .work/17_stable \
+            --overlay-source .work/overlays_17_source --verify-core \
             --packages "$REQUESTED_PACKAGES" --aapt2 '${{ steps.tools.outputs.aapt2 }}'
 
       - name: Preserve metadata, checksums and publication receipts
-        if: always()
+        if: ${{ always() && !inputs.verify_only }}
         uses: actions/upload-artifact@v6
         with:
           name: android-17-stable-release
@@ -235,7 +225,10 @@ jobs:
             release/.work/production/*/download-metadata/
             release/.work/production/*/github-mirror/mirror-receipt.json
             release/.work/local/*/registry/metadata/
-            release/.work/core-smoke/report.json
+            release/.work/production/*/overlays/report.json
+            release/.work/local/*/overlays/report.json
+            release/.work/production/*/core-smoke/report.json
+            release/.work/local/*/core-smoke/report.json
             release/.work/tracker/release_tracker.json
             release/.work/tracker/config_version.json
             release/.work/website/_data/changelogs.yaml
@@ -255,7 +248,7 @@ jobs:
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
               title = 'Android 17 local verification (no publication)' if os.environ['VERIFY_ONLY'] == 'true' else 'Android 17 stable release'
               summary.write('## ' + title + '\n\n')
-              for label, key in [('Release engine/changelog', 'RELEASE_COMMIT'), ('Stable source', 'STABLE_COMMIT'), ('Overlays', 'OVERLAYS_COMMIT'), ('Builder', 'BUILDER_COMMIT')]:
+              for label, key in [('Release engine/changelog', 'RELEASE_COMMIT'), ('Stable source', 'STABLE_COMMIT'), ('Overlay source', 'OVERLAY_SOURCE_COMMIT'), ('Builder', 'BUILDER_COMMIT')]:
                   summary.write(f"- {label}: `{os.environ.get(key, 'not resolved')}`\n")
               state_file = Path('release/.work/run-state.json')
               if state_file.exists():
@@ -264,4 +257,16 @@ jobs:
                       summary.write(f"- {key}: `{state.get(key, 'not resolved')}`\n")
                   for stage, status in state['stages'].items():
                       summary.write(f'- {stage}: {status}\n')
+                  overlays = state.get('overlayBuild', {})
+                  if overlays:
+                      summary.write(f"- Freshly built overlay APKs: {len(overlays['files'])}\n")
+                      summary.write(f"- apktool: {overlays.get('apktool', {}).get('version', 'bundled')}\n")
+                      summary.write(f"- Overlay source tree SHA-256: `{overlays['sourceTreeSha256']}`\n")
+                  candidate = state.get('candidate')
+                  manifest = Path(candidate) / 'release-manifest.json' if candidate else None
+                  if manifest and manifest.is_file():
+                      for artifact in json.loads(manifest.read_text())['files']:
+                          names = artifact.get('validation', {}).get('pixelLauncherOverlays', [])
+                          if names:
+                              summary.write(f"- {Path(artifact['path']).name}: validated Pixel Launcher overlays {', '.join(names)}\n")
           PY

@@ -10,7 +10,8 @@ metadata, and then updates the website changelog and
 release/config trackers. Caching and onDemand are not part of this flow.
 
 Enable **verify_only** to build and validate the full selection on Linux without
-publishing. Both modes first exercise real Core/CoreGo APKs through raw-source
+publishing. Both modes first compile all overlay source targets in one shared
+release-engine pass, then exercise real Core/CoreGo APKs through raw-source
 and local-registry assembly and compare their outputs. The gate verifies generated
 permission XML, package IDs, binary hashes, merged support, Go files and installer
 size accounting. The same SDK aapt2 inspects APKs during publication and final ZIP
@@ -26,7 +27,14 @@ The code and changelog are maintained in the private
 repository. Edit its **`changelogs.yaml`**, commit and push, then update
 `RELEASE_COMMIT` in `.github/workflows/NikGappsAndroid17Release.yml` to that accepted
 revision. The workflow reads its builder pin directly from `builder-pin.json`.
-Use the full tested/pushed `17_stable` SHA as the `stable_commit` input. The initial
+Use the full tested/pushed `17_stable` SHA as `stable_commit` and the tested/pushed
+`overlays_17_source` SHA as `overlay_source_commit`. The source checkout is copied
+into the run workspace and compiled with the pinned official apktool (currently
+3.0.3); its download is SHA-256 verified. Pixel Launcher's framework and color
+APKs are built alongside every other overlay and included together in its payload.
+The release uses these new APKs directly, without a compiled-overlay repository
+or a separate Pixel Launcher build step. Source/tree/tool hashes and output APK
+hashes are retained in overlay reports, run state and the release receipt. The initial
 shared-Core SHA is `ae4bef228debce1be3f980b9bcbbcd3ab29e572b`; it includes the
 known-working WebView 134 set, not uncommitted local WebView 145 files.
 
@@ -49,8 +57,10 @@ Confirmed downloads are stored under `sourceforge` in the existing GitLab regist
 release manifest (`85036487`). The website follows the existing `releases/index.json`
 and reads `sourceforge.files`; no second website copy or download index is maintained.
 Entries contain published URLs, file sizes and hashes alongside the same app release.
-Future GitHub artifacts retain only metadata, config, checksums and receipts;
+Production GitHub artifacts retain only metadata, config, checksums and receipts;
 release ZIPs are excluded because they are already stored on SourceForge.
+`verify_only` uploads no artifacts; inspect its Actions summary for the source/tool
+hashes, overlay count and confirmation of both overlays in Pixel Launcher's ZIP.
 
 To backfill or retry download indexing for an existing upload, run **Sync
 SourceForge Release Metadata** with the ISO date and exact registry release ID.
