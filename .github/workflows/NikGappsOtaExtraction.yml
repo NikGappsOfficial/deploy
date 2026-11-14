@@ -149,7 +149,7 @@ jobs:
 
       - name: Cache public toolchain dependencies only
         if: ${{ !inputs.regenerate_reports && steps.preflight.outputs.completed != 'true' && steps.resume.outputs.completed != 'true' }}
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
           context: operations
           target: toolchain
@@ -159,7 +159,7 @@ jobs:
 
       - name: Build private execution image and run engine tests
         if: ${{ !inputs.regenerate_reports && steps.preflight.outputs.completed != 'true' && steps.resume.outputs.completed != 'true' }}
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
           context: operations
           target: execution
