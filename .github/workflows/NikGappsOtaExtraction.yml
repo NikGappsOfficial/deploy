@@ -55,7 +55,7 @@ concurrency:
 
 env:
   OPERATIONS_REPOSITORY: nikhilmenghani/nikgapps-operations
-  OPERATIONS_REVISION: bce08b8fbcdc9908203f6e536f374f315e33313d
+  OPERATIONS_REVISION: 7b6759dabc50c0cdfcfa82016b82047b9c34cbf0
   EXECUTION_IMAGE: nikgapps-operations:extraction
 
 jobs:
@@ -176,22 +176,13 @@ jobs:
           DEVICE: ${{ inputs.device }}
           ANDROID_VERSION: ${{ inputs.android_version }}
           BUILD: ${{ steps.preflight.outputs.build }}
-          BASELINE_NAMESPACE: ${{ inputs.baseline_namespace || 'nikgapps' }}
-          NOTIFY_TELEGRAM: ${{ inputs.notify_telegram }}
           SAVE_EXTRACTION: ${{ inputs.save_extraction }}
-          G_TOKEN: ${{ secrets.G_TOKEN }}
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/nikgapps-ota"
           arguments=(--root /work --device "$DEVICE" --android "$ANDROID_VERSION")
           if [ -n "$BUILD" ]; then
             arguments+=(--build "$BUILD")
-          fi
-          if [ -n "$BASELINE_NAMESPACE" ]; then
-            arguments+=(--baseline-namespace "$BASELINE_NAMESPACE")
-          fi
-          if [ "$NOTIFY_TELEGRAM" = 'true' ]; then
-            arguments+=(--notify)
           fi
           if [ "$SAVE_EXTRACTION" != 'true' ]; then
             arguments+=(--skip-archive)
@@ -202,12 +193,29 @@ jobs:
             --env GITHUB_ACTIONS=true \
             --env FORCE_COLOR=1 \
             --env PYTHONUNBUFFERED=1 \
-            --env G_TOKEN \
             --mount "type=bind,source=$RUNNER_TEMP/nikgapps-ota,target=/work" \
             --entrypoint python \
             "$EXECUTION_IMAGE" /app/tools/extract_workflow.py "${arguments[@]}"
 
-      - name: Publish source and reports and record verified completion
+      - name: Persist extracted source and inventory in GitLab
+        id: checkpoint
+        if: ${{ !inputs.regenerate_reports && steps.preflight.outputs.completed != 'true' && steps.resume.outputs.completed != 'true' }}
+        env:
+          G_TOKEN: ${{ secrets.G_TOKEN }}
+          DEVICE: ${{ inputs.device }}
+          ANDROID: ${{ inputs.android_version }}
+          BUILD: ${{ steps.preflight.outputs.build }}
+          NAMESPACE: ${{ inputs.baseline_namespace || 'nikgapps' }}
+          FORCE_RERUN: ${{ inputs.force_rerun }}
+        run: |
+          folder=$(python3 -c 'import json,os; from pathlib import Path; p=Path(os.environ["RUNNER_TEMP"])/"nikgapps-ota/reports/run.json"; print("/work/"+json.loads(p.read_text())["extractedFolder"])')
+          args=(checkpoint --device "$DEVICE" --android "$ANDROID" --build "$BUILD" --namespace "$NAMESPACE" --folder "$folder" --output /work/reports)
+          if [ "$FORCE_RERUN" = true ]; then args+=(--force); fi
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp --env G_TOKEN --env GITHUB_ACTIONS=true \
+            --mount "type=bind,source=$RUNNER_TEMP/nikgapps-ota,target=/work" \
+            --entrypoint python "$EXECUTION_IMAGE" /app/tools/ota_repo.py "${args[@]}"
+
+      - name: Generate upgrade reports and notify
         id: publication
         if: ${{ !inputs.regenerate_reports && steps.preflight.outputs.completed != 'true' && steps.resume.outputs.completed != 'true' }}
         env:
@@ -217,12 +225,9 @@ jobs:
           BUILD: ${{ steps.preflight.outputs.build }}
           NAMESPACE: ${{ inputs.baseline_namespace || 'nikgapps' }}
           NOTIFY: ${{ inputs.notify_telegram }}
-          FORCE_RERUN: ${{ inputs.force_rerun }}
         run: |
-          folder=$(python3 -c 'import json,os; from pathlib import Path; p=Path(os.environ["RUNNER_TEMP"])/"nikgapps-ota/reports/run.json"; print("/work/"+json.loads(p.read_text())["extractedFolder"])')
-          args=(publish --device "$DEVICE" --android "$ANDROID" --build "$BUILD" --namespace "$NAMESPACE" --folder "$folder" --output /work/reports)
+          args=(finish --device "$DEVICE" --android "$ANDROID" --build "$BUILD" --namespace "$NAMESPACE" --output /work/reports --current-source /work/prepared-source)
           if [ "$NOTIFY" = true ]; then args+=(--notify); fi
-          if [ "$FORCE_RERUN" = true ]; then args+=(--force); fi
           docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp --env G_TOKEN --env GITHUB_ACTIONS=true \
             --mount "type=bind,source=$RUNNER_TEMP/nikgapps-ota,target=/work" \
             --entrypoint python "$EXECUTION_IMAGE" /app/tools/ota_repo.py "${args[@]}"
@@ -250,6 +255,7 @@ jobs:
         if: always()
         env:
           PUBLICATION_OUTCOME: ${{ steps.publication.outcome }}
+          CHECKPOINT_OUTCOME: ${{ steps.checkpoint.outcome }}
         shell: bash
         run: |
           if [ "${{ inputs.regenerate_reports }}" = true ] && [ "${{ steps.resume.outputs.completed }}" = true ]; then
@@ -267,7 +273,8 @@ jobs:
           run = json.loads((reports / 'run.json').read_text()) if (reports / 'run.json').exists() else {}
           audit = json.loads((reports / 'source-selection.json').read_text()) if (reports / 'source-selection.json').exists() else {}
           lines = ['## OTA extraction', '', f"Extraction status: {run.get('status', 'not completed')}",
-                   f"GitLab publication: {os.environ.get('PUBLICATION_OUTCOME', 'not completed')}",
+                   f"Source/inventory persistence: {os.environ.get('CHECKPOINT_OUTCOME', 'not completed')}",
+                   f"Report generation and delivery: {os.environ.get('PUBLICATION_OUTCOME', 'not completed')}",
                    f"Build: {run.get('selected', {}).get('build', 'unavailable')}",
                    f"Source ZIP retained: {run.get('sourceZipRetained', 'extraction did not complete')}",
                    f"Selection counts: {audit.get('counts', {})}", '',
