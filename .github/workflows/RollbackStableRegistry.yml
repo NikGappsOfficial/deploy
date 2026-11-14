@@ -36,7 +36,7 @@ jobs:
       GIT_CONFIG_KEY_0: credential.helper
       GIT_CONFIG_VALUE_0: ''
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - uses: actions/setup-python@v7
         with:
@@ -55,7 +55,7 @@ jobs:
               output.write(f"ref={workflow['env']['RELEASE_REF']}\n")
           PY
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           repository: nikhilmenghani/nikgapps-release
           ref: ${{ steps.engine.outputs.ref }}
@@ -86,7 +86,7 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write(f"commit={pin['commit']}\n")
           PY
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         if: inputs.apply
         with:
           repository: nikgapps/project

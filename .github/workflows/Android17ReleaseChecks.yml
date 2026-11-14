@@ -33,7 +33,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-python@v7
@@ -54,7 +54,7 @@ jobs:
       G_TOKEN: ${{ secrets.G_TOKEN }}
       CATALOG_PROJECT: ${{ vars.GITLAB_CATALOG_PROJECT_ID || '85036487' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-python@v7
@@ -71,7 +71,7 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write(f"ref={document['env']['RELEASE_REF']}\n")
           PY
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           repository: nikhilmenghani/nikgapps-release
           ref: ${{ steps.engine.outputs.ref }}

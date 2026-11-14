@@ -23,7 +23,7 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-python@v7
@@ -40,7 +40,7 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write(f"ref={workflow['env']['RELEASE_REF']}\n")
           PY
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           repository: nikhilmenghani/nikgapps-release
           ref: ${{ steps.engine.outputs.ref }}
@@ -57,7 +57,7 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write(f"commit={pin['commit']}\n")
           PY
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           repository: nikgapps/project
           ref: ${{ steps.builder.outputs.commit }}

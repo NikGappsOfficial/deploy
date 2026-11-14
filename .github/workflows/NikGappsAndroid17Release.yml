@@ -64,7 +64,7 @@ jobs:
           fi
 
       - name: Check out latest release engine
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           repository: ${{ env.RELEASE_REPOSITORY }}
           ref: ${{ env.RELEASE_REF }}
@@ -105,7 +105,7 @@ jobs:
           PY
 
       - name: Check out reviewed builder
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           repository: nikgapps/project
           ref: ${{ steps.builder.outputs.commit }}
