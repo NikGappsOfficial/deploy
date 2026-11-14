@@ -212,7 +212,7 @@ jobs:
 
       - name: Preserve metadata, checksums and publication receipts
         if: ${{ always() && !inputs.verify_only }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: android-17-stable-release
           path: |

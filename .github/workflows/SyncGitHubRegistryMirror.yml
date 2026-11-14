@@ -61,7 +61,7 @@ jobs:
         run: python -m scripts.github_mirror
       - name: Preserve mirror verification receipt
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: github-registry-mirror-receipt
           path: release/.work/github-mirror/mirror-receipt.json
