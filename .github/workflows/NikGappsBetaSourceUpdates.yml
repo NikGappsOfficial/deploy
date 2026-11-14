@@ -57,7 +57,7 @@ jobs:
       DEVICE: ${{ needs.configure.outputs.device }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Setup SSH Keys and known_hosts 
         uses: webfactory/ssh-agent@v0.10.0
