@@ -36,7 +36,7 @@ on:
         default: false
         required: true
       force_rerun:
-        description: Re-extract and republish this build even if it already succeeded
+        description: Re-extract and replace the source snapshot even if this build already succeeded
         type: boolean
         default: false
         required: true
@@ -55,7 +55,7 @@ concurrency:
 
 env:
   OPERATIONS_REPOSITORY: nikhilmenghani/nikgapps-operations
-  OPERATIONS_REVISION: 2d93c6918cd82b12170a6eae932202eef4e934bd
+  OPERATIONS_REVISION: 22b90c34c303970d16a06c601ffacb6e2c763173
   EXECUTION_IMAGE: nikgapps-operations:extraction
 
 jobs:
@@ -281,6 +281,7 @@ jobs:
                    f"Package/file changes: {run.get('tracking', {}).get('counts', {})}",
                    f"Full extraction archived: {run.get('archiveCreated', False)}",
                    'When requested, the TAR.XZ extraction is retained for 3 days; reports for 7 days.',
+                   'Source retention: latest snapshot only per dated repository; verified replacements retire superseded projects. Checkpoints resume reports without re-extraction.',
                    'GitLab completion is recorded only after successful publication and requested Telegram delivery. Package channels are unchanged.']
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
               stream.write('\n'.join(lines) + '\n')
