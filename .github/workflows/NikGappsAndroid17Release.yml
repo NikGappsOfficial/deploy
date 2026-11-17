@@ -34,7 +34,8 @@ concurrency:
 
 env:
   RELEASE_REPOSITORY: nikhilmenghani/nikgapps-release
-  RELEASE_REF: main
+  # Keep the current release runtime available during the installed-engine cutover.
+  RELEASE_REF: cad5fa5d850496e024b3d3ca1c936c81f93eb714
   ANDROID_VERSION: '17'
   ENVIRONMENT_TYPE: production
   RELEASE_TYPE: stable

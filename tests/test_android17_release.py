@@ -26,10 +26,10 @@ class Android17ReleaseTests(unittest.TestCase):
         old = yaml.load((ROOT / '.github/workflows/PublishStableRegistry.yml').read_text(), Loader=yaml.BaseLoader)
         self.assertEqual(old['concurrency']['group'], self.workflow['concurrency']['group'])
         self.assertIn('corego', self.workflow['on']['workflow_dispatch']['inputs']['packages']['default'].split(','))
-        self.assertEqual('main', self.workflow['env']['RELEASE_REF'])
+        self.assertEqual('cad5fa5d850496e024b3d3ca1c936c81f93eb714', self.workflow['env']['RELEASE_REF'])
         self.assertNotIn('RELEASE_COMMIT', self.workflow['env'])
 
-    def test_release_engine_uses_latest_branch_and_records_resolved_commit(self):
+    def test_release_engine_uses_shared_ref_and_records_resolved_commit(self):
         checkout = next(s for s in self.steps if s.get('name') == 'Check out latest release engine')
         self.assertEqual('${{ env.RELEASE_REF }}', checkout['with']['ref'])
         record = next(i for i, s in enumerate(self.steps) if s.get('name') == 'Record resolved release engine commit')
@@ -51,7 +51,7 @@ class Android17ReleaseTests(unittest.TestCase):
                 output = Path(temporary) / 'output'
                 subprocess.run([sys.executable, '-c', code], cwd=ROOT,
                     env={**os.environ, 'GITHUB_OUTPUT': str(output)}, check=True, capture_output=True)
-                self.assertEqual('ref=main', output.read_text().strip(), name)
+                self.assertEqual(f"ref={self.workflow['env']['RELEASE_REF']}", output.read_text().strip(), name)
 
     def test_myenv_bootstrap_precedes_git_and_publication(self):
         self.assertEqual('${{ secrets.G_TOKEN }}', self.workflow['env']['G_TOKEN'])
