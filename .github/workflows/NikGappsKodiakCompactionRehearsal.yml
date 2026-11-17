@@ -1,0 +1,45 @@
+name: Kodiak source compaction rehearsal
+
+on:
+  push:
+    branches: [migration/kodiak-compaction-rehearsal]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kodiak-compaction-rehearsal-89082372
+  cancel-in-progress: false
+
+jobs:
+  rehearse:
+    if: github.repository == 'NikGappsOfficial/deploy' && github.ref == 'refs/heads/migration/kodiak-compaction-rehearsal'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: ${{ github.workspace }}/operations/src
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: nikhilmenghani/nikgapps-operations
+          ref: 14d6a122f060c91052d2ec50498acdf3f3a7c101
+          token: ${{ secrets.MIGRATION_CHECKOUT_TOKEN || secrets.G_TOKEN }}
+          path: operations
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Set up the rehearsal tools
+        run: |
+          python -m pip install --require-hashes -r operations/bootstrap.lock
+          python -m pip install PyYAML==6.0.3
+          git lfs version
+      - name: Check rehearsal safeguards
+        run: python -m unittest discover -s tests -p test_kodiak_compaction_rehearsal.py -v
+      - name: Rehearse and verify the protected-branch cutover
+        env:
+          G_TOKEN: ${{ secrets.G_TOKEN }}
+        run: python scripts/rehearse_kodiak_compaction.py
