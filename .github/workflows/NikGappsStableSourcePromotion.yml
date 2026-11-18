@@ -1,0 +1,99 @@
+name: NikGapps 17 Beta to Stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Review live changes, apply an approved tree, or run the source tests
+        type: choice
+        options: [review, apply, test]
+        default: review
+        required: true
+      approval_id:
+        description: Full Approval ID from the upgrade report, required for apply
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android17-stable-source-promotion
+  cancel-in-progress: false
+
+jobs:
+  stable-source:
+    if: github.repository == 'NikGappsOfficial/deploy' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      PYTHONPATH: ${{ github.workspace }}/operations/src
+    steps:
+      - name: Resolve current Operations main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: nikhilmenghani/nikgapps-operations
+          ref: main
+          token: ${{ secrets.G_TOKEN }}
+          path: operations
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Run stable source promotion tests
+        shell: bash
+        run: |
+          printf 'Operations commit `%s`\n\n' "$(git -C operations rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          git lfs version
+          python -m unittest discover -s operations/tests -p 'test_*promotion.py' -v
+
+      - name: Prepare the Android package inspector
+        if: inputs.action != 'test'
+        run: |
+          test -n "$ANDROID_HOME"
+          tools="$ANDROID_HOME/build-tools/36.0.0"
+          if [ ! -x "$tools/aapt2" ]; then
+            sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+            if [ ! -x "$sdkmanager" ]; then sdkmanager="$(command -v sdkmanager)"; fi
+            "$sdkmanager" --sdk_root="$ANDROID_HOME" --install 'build-tools;36.0.0' < <(yes)
+          fi
+          test -x "$tools/aapt2"
+          test -f "$tools/lib/apksigner.jar"
+          printf 'AAPT2=%s\n' "$tools/aapt2" >> "$GITHUB_ENV"
+          printf 'APKSIGNER=%s\n' "$tools/lib/apksigner.jar" >> "$GITHUB_ENV"
+          python -m pip install --require-hashes -r operations/bootstrap.lock
+
+      - name: Prepare space for the hydrated Git sources
+        if: inputs.action != 'test' && runner.environment == 'github-hosted'
+        run: |
+          available="$(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}')"
+          if [ "$available" -lt $((22 * 1024 * 1024)) ]; then
+            # These tools belong to the disposable runner and are unused by this job.
+            sudo rm -rf -- /usr/share/dotnet /opt/ghc /usr/local/.ghcup
+          fi
+          df -h "$RUNNER_TEMP"
+
+      - name: Review or apply the exact source tree
+        if: inputs.action != 'test'
+        env:
+          G_TOKEN: ${{ secrets.G_TOKEN }}
+          PROMOTION_ACTION: ${{ inputs.action }}
+          APPROVAL_ID: ${{ inputs.approval_id }}
+          NIKOPS_ENVIRONMENT: ${{ inputs.action == 'apply' && 'production' || 'local' }}
+        working-directory: operations
+        shell: bash
+        run: |
+          revision="$(git rev-parse HEAD)"
+          args=("$PROMOTION_ACTION" --work "$RUNNER_TEMP/stable-promotion" --aapt2 "$AAPT2"
+                --apksigner "$APKSIGNER" --operations-revision "$revision")
+          if [ "$PROMOTION_ACTION" = apply ]; then args+=(--approve "$APPROVAL_ID"); fi
+          python -m nikgapps_ops.stable_promotion "${args[@]}"
+
+      - name: Show the upgrade report
+        if: always() && inputs.action != 'test'
+        shell: bash
+        run: |
+          report="$RUNNER_TEMP/stable-promotion/upgrade-report.md"
+          if [ -s "$report" ]; then cat "$report" >> "$GITHUB_STEP_SUMMARY"; fi
