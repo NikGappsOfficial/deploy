@@ -1,0 +1,10 @@
+{
+  "operations_revision": "831a9f2b5b5cffea4c8d92b730a54c249110daa3",
+  "stable_revision": "ae4bef228debce1be3f980b9bcbbcd3ab29e572b",
+  "kodiak_revision": "22fb6eeaed14a037599d25ec00e8a665e15116b6",
+  "beta_revision": "6808ebe0560e5dcacfee58830edd2cda385effde",
+  "overlay_project": "nikgapps/17_beta_migration_test",
+  "overlay_source_revision": "dff9aa846135968fce3f82c8fb8dabe2dd0185e0",
+  "firmware_project": "nikgapps/17_kodiak_261105",
+  "firmware_revision": "2de2cc51106d8a8f115a2af3090f4967a19e80b0"
+}
