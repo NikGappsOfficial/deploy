@@ -33,7 +33,8 @@ class VerifyBetaWorkflowTests(unittest.TestCase):
         self.assertIn("commandlinetools-linux-15859902_latest.zip", sdk)
         self.assertIn("sha256sum --check", sdk)
         self.assertLess(sdk.index("sha256sum --check"), sdk.index("unzip -q"))
-        self.assertIn("--install 'platforms;android-37.0' 'build-tools;37.0.0'", sdk)
+        self.assertIn("--install 'platforms;android-37.0' 'build-tools;36.0.0'", sdk)
+        self.assertIn('"$apksigner_sha256" "$sdk_build_tools/lib/apksigner.jar" | sha256sum --check -', sdk)
         self.assertIn("ANDROID_HOME=%s", sdk)
         self.assertIn("ANDROID_SDK_ROOT=%s", sdk)
 

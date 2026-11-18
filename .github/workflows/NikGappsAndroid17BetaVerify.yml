@@ -118,17 +118,20 @@ jobs:
           mv "$sdk_root/cmdline-tools/cmdline-tools" "$sdk_root/cmdline-tools/latest"
           rm -- "$archive"
           sdkmanager="$sdk_root/cmdline-tools/latest/bin/sdkmanager"
-          "$sdkmanager" --sdk_root="$sdk_root" --install 'platforms;android-37.0' 'build-tools;37.0.0' < <(yes)
+          "$sdkmanager" --sdk_root="$sdk_root" --install 'platforms;android-37.0' 'build-tools;36.0.0' < <(yes)
           test -f "$sdk_root/platforms/android-37.0/android.jar"
           df -h "$RUNNER_TEMP"
-          sdk_build_tools="$sdk_root/build-tools/37.0.0"
+          sdk_build_tools="$sdk_root/build-tools/36.0.0"
           test -x "$sdk_build_tools/zipalign"
+          apksigner_sha256='3716d9311e55d2b0918a2fd9d54ba9e406c5f6abeea700b287f11259bc163dec'
+          printf '%s  %s\n' "$apksigner_sha256" "$sdk_build_tools/lib/apksigner.jar" | sha256sum --check -
           java -version
           "$sdk_build_tools/aapt2" version
           java -jar "$sdk_build_tools/lib/apksigner.jar" version
           printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' "$sdk_root" "$sdk_root" >> "$GITHUB_ENV"
           echo "$sdk_build_tools" >> "$GITHUB_PATH"
           printf 'directory=%s\n' "$sdk_build_tools" >> "$GITHUB_OUTPUT"
+          printf 'Android SDK platform `37.0`, Build Tools `36.0.0`, apksigner SHA-256 `%s`\n\n' "$apksigner_sha256" >> "$GITHUB_STEP_SUMMARY"
       - name: Fetch exact GitLab inputs with read access
         env:
           GITLAB_READ_TOKEN: ${{ secrets.GITLAB_SOURCE_READ_TOKEN || secrets.NIKGAPPS_GITLAB_READ_TOKEN }}
