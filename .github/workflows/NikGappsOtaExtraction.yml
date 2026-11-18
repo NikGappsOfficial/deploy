@@ -236,6 +236,7 @@ jobs:
           args=(checkpoint --device "$DEVICE" --android "$ANDROID" --build "$BUILD" --namespace "$NAMESPACE" --folder "$folder" --output /work/reports)
           if [ "$FORCE_RERUN" = true ]; then args+=(--force); fi
           docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp --env G_TOKEN --env GITHUB_ACTIONS=true \
+            --env GITHUB_REPOSITORY \
             --mount "type=bind,source=$RUNNER_TEMP/nikgapps-ota,target=/work" \
             --entrypoint python "$EXECUTION_IMAGE" /app/tools/ota_repo.py "${args[@]}"
 
@@ -253,6 +254,7 @@ jobs:
           args=(finish --device "$DEVICE" --android "$ANDROID" --build "$BUILD" --namespace "$NAMESPACE" --output /work/reports --current-source /work/prepared-source)
           if [ "$NOTIFY" = true ]; then args+=(--notify); fi
           docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp --env G_TOKEN --env GITHUB_ACTIONS=true \
+            --env GITHUB_REPOSITORY \
             --env GITHUB_OUTPUT=/tmp/step-output \
             --mount "type=bind,source=$GITHUB_OUTPUT,target=/tmp/step-output" \
             --mount "type=bind,source=$RUNNER_TEMP/nikgapps-ota,target=/work" \
