@@ -326,7 +326,6 @@ jobs:
         shell: bash
     env:
       G_TOKEN: ${{ secrets.G_TOKEN }}
-      WORK: ${{ runner.temp }}/ota-followups
       ANDROID: ${{ inputs.android_version || '17' }}
       DEVICE: ${{ inputs.device || 'kodiak' }}
       NAMESPACE: ${{ inputs.baseline_namespace || 'nikgapps' }}
@@ -353,6 +352,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Allocate an isolated follow-up workspace
+        run: printf 'WORK=%s/ota-followups\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+
       - name: Compare durable completion checkpoints
         id: followup
         env:
@@ -365,13 +367,14 @@ jobs:
         run: |
           python -m pip install --require-hashes -r operations/bootstrap.lock
           release_revision="$(git -C release rev-parse HEAD)"
+          release_tree="$(git -C release rev-parse HEAD:nikgapps_release)"
           test "$(git -C operations rev-parse HEAD)" = "$OPERATIONS_REVISION"
           printf 'Operations %s\n\nRelease %s\n\nOTA source %s @ %s\n\n' \
             "$OPERATIONS_REVISION" "$release_revision" "$SOURCE_PROJECT" "$SOURCE_REVISION" >> "$GITHUB_STEP_SUMMARY"
           PYTHONPATH=operations/src python -m nikgapps_ops.ota_followups probe \
             --work "$WORK" --namespace "$NAMESPACE" --android "$ANDROID" --device "$DEVICE" \
             --source-project "$SOURCE_PROJECT" --source-revision "$SOURCE_REVISION" --build "$BUILD" \
-            --operations-revision "$OPERATIONS_REVISION" --release-revision "$release_revision" \
+            --operations-revision "$OPERATIONS_REVISION" --release-revision "$release_revision" --release-input-tree "$release_tree" \
             --overlay-project "$OVERLAY_PROJECT" --overlay-branch "$OVERLAY_BRANCH"
           if grep -qx 'beta_needed=false' "$GITHUB_OUTPUT"; then
             echo 'Device and beta match their completed inputs. Skipped SDK setup and file transfers.' >> "$GITHUB_STEP_SUMMARY"
@@ -456,9 +459,10 @@ jobs:
           python -m unittest discover -s operations/tests -p test_ota_followups.py -v
           operations_revision="$(git -C operations rev-parse HEAD)"
           release_revision="$(git -C release rev-parse HEAD)"
+          release_tree="$(git -C release rev-parse HEAD:nikgapps_release)"
           printf 'Operations %s\n\nRelease %s\n\n' "$operations_revision" "$release_revision" >> "$GITHUB_STEP_SUMMARY"
           python -m nikgapps_ops.ota_followups probe --work "$RUNNER_TEMP/followups-probe" \
             --namespace nikgapps --android 17 --device kodiak --build CP4A.261105.040.D1 \
             --source-project nikgapps/17_kodiak_261105 --source-revision 2de2cc51106d8a8f115a2af3090f4967a19e80b0 \
-            --operations-revision "$operations_revision" --release-revision "$release_revision" \
+            --operations-revision "$operations_revision" --release-revision "$release_revision" --release-input-tree "$release_tree" \
             --overlay-project nikgapps/17_beta_migration_test --overlay-branch overlay-source
