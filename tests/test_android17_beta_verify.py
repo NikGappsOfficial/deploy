@@ -29,7 +29,13 @@ class VerifyBetaWorkflowTests(unittest.TestCase):
         self.assertEqual(release[0]["persist-credentials"], "false")
         self.assertEqual(set(document["on"]["workflow_dispatch"]["inputs"]),
                          beta.REVISIONS | {"firmware_project", "overlay_project"})
-        self.assertTrue(any("sdkmanager 'platforms;android-37.0'" in step.get("run", "") for step in job["steps"]))
+        sdk = next(step["run"] for step in job["steps"] if step.get("id") == "sdk")
+        self.assertIn("commandlinetools-linux-15859902_latest.zip", sdk)
+        self.assertIn("sha256sum --check", sdk)
+        self.assertLess(sdk.index("sha256sum --check"), sdk.index("unzip -q"))
+        self.assertIn("--install 'platforms;android-37.0' 'build-tools;37.0.0'", sdk)
+        self.assertIn("ANDROID_HOME=%s", sdk)
+        self.assertIn("ANDROID_SDK_ROOT=%s", sdk)
 
     def test_exact_revisions_and_safe_project_paths(self):
         pins = {key: "a" * 40 for key in beta.REVISIONS}

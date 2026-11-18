@@ -27,8 +27,9 @@ existing Deploy credential export and then the legacy `GITLAB_TOKEN` when
 needed. Git credentials and payloads remain in the runner. The workflow
 publishes its verification summary and retains the logs only on the runner.
 
-The builder uses the Android SDK `android-37.0` platform and JDK 17, verifies the
-pinned apktool, compiles the overlays and compares
+The builder installs the [official command-line tools](https://developer.android.com/studio/#command-tools)
+by pinned archive SHA-256. It uses the Android SDK `android-37.0` platform,
+Build Tools 37.0.0 and JDK 17, verifies the pinned apktool, compiles the overlays and compares
 the Pixel Launcher APK hashes with the beta payload. It runs beta preparation
 twice to verify reuse, reads the candidate back through disposable Git refs
 and rehearses restoring the original beta parent. Verify-only does not advance
