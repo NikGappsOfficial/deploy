@@ -8,9 +8,6 @@ on:
         type: string
         required: false
         default: '17'
-  schedule:
-    # Twice monthly, after the start and middle of the month (09:00 UTC).
-    - cron: '0 9 2,16 * *'
 
 permissions:
   contents: read
@@ -33,6 +30,10 @@ jobs:
         run: |
           if [[ ! "$ANDROID_VERSION" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
             echo "Invalid Android version: $ANDROID_VERSION" >&2
+            exit 1
+          fi
+          if [[ "$ANDROID_VERSION" =~ ^17([.]0+)?$ ]]; then
+            echo 'Use the NikGapps 17 Beta to Stable workflow for reviewed Android 17 promotion.' >&2
             exit 1
           fi
 

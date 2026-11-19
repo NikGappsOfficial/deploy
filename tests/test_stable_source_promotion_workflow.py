@@ -32,3 +32,12 @@ class StableSourcePromotionWorkflowTests(unittest.TestCase):
         self.assertIn('--approve "$APPROVAL_ID"', promotion["run"])
         self.assertIn('"$GITHUB_STEP_SUMMARY"', steps["Show the upgrade report"]["run"])
         self.assertTrue(all("upload-artifact" not in step.get("uses", "") for step in steps.values()))
+
+    def test_legacy_promotion_rejects_android_17_before_getting_credentials(self):
+        legacy = Path(__file__).resolve().parents[1] / ".github/workflows/PromoteBetaToStable.yml"
+        workflow = yaml.load(legacy.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+        self.assertEqual(set(workflow["on"]), {"workflow_dispatch"})
+        validation = workflow["jobs"]["promote"]["steps"][0]
+        self.assertEqual(validation["name"], "Validate target")
+        self.assertIn('^17([.]0+)?$', validation["run"])
+        self.assertIn("NikGapps 17 Beta to Stable", validation["run"])
