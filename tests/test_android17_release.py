@@ -45,6 +45,7 @@ class Android17ReleaseTests(unittest.TestCase):
         selection = next(i for i, s in enumerate(self.steps) if s.get('id') == 'selection')
         self.assertLess(record, selection)
         self.assertIn('python -m pip install . ', self.steps[selection - 1]['run'])
+        self.assertIn('from nikgapps_release.release import selected_groups', self.steps[selection]['run'])
         for name in ('nikgapps/project', 'builder-pin.json', 'release/.engine'):
             self.assertNotIn(name, json.dumps(self.steps))
 

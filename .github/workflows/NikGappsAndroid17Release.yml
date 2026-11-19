@@ -106,7 +106,7 @@ jobs:
         run: |
           python - <<'PY'
           import os
-          from scripts.release import selected_groups
+          from nikgapps_release.release import selected_groups
           selected_groups(os.environ['REQUESTED_PACKAGES'])
           PY
 
