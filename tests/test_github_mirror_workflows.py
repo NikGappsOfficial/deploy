@@ -45,6 +45,17 @@ class MirrorWorkflowTests(unittest.TestCase):
         artifact = next(s for s in steps if s.get('uses', '').startswith('actions/upload-artifact@'))
         self.assertEqual('release/.work/github-mirror/mirror-receipt.json', artifact['with']['path'])
 
+    def test_registry_writers_install_the_release_engine(self):
+        for name, workflow in self.workflows():
+            steps = next(iter(workflow['jobs'].values()))['steps']
+            commands = '\n'.join(step.get('run', '') for step in steps)
+            self.assertIn('python -m pip install ./release', commands, name)
+            self.assertIn('git -C release', commands, name)
+            for legacy in ('nikgapps/project', 'builder-pin.json', '/.engine', '--builder '):
+                self.assertNotIn(legacy, str(steps), name)
+            if name == 'PublishStableRegistry':
+                self.assertIn('nikgapps-release-registry sync --publish', commands)
+
 
 if __name__ == '__main__':
     unittest.main()

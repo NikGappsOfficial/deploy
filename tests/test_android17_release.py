@@ -24,19 +24,29 @@ class Android17ReleaseTests(unittest.TestCase):
     def test_release_is_manual_and_shares_registry_lock(self):
         self.assertEqual({'workflow_dispatch'}, set(self.workflow['on']))
         old = yaml.load((ROOT / '.github/workflows/PublishStableRegistry.yml').read_text(), Loader=yaml.BaseLoader)
-        self.assertEqual(old['concurrency']['group'], self.workflow['concurrency']['group'])
+        self.assertEqual(
+            "${{ inputs.verify_only && 'android17-release-preview' || '" + old['concurrency']['group'] + "' }}",
+            self.workflow['concurrency']['group'],
+        )
+        self.assertEqual(
+            "github.repository == 'NikGappsOfficial/deploy' && (github.ref == 'refs/heads/main' || inputs.verify_only)",
+            self.workflow['jobs']['release']['if'],
+        )
         self.assertIn('corego', self.workflow['on']['workflow_dispatch']['inputs']['packages']['default'].split(','))
-        self.assertEqual('cad5fa5d850496e024b3d3ca1c936c81f93eb714', self.workflow['env']['RELEASE_REF'])
+        self.assertEqual('main', self.workflow['env']['RELEASE_REF'])
         self.assertNotIn('RELEASE_COMMIT', self.workflow['env'])
 
-    def test_release_engine_uses_shared_ref_and_records_resolved_commit(self):
+    def test_release_engine_uses_latest_branch_and_records_resolved_commit(self):
         checkout = next(s for s in self.steps if s.get('name') == 'Check out latest release engine')
         self.assertEqual('${{ env.RELEASE_REF }}', checkout['with']['ref'])
         record = next(i for i, s in enumerate(self.steps) if s.get('name') == 'Record resolved release engine commit')
         self.assertIn('git -C release rev-parse HEAD', self.steps[record]['run'])
         self.assertIn('RELEASE_COMMIT=', self.steps[record]['run'])
-        builder = next(i for i, s in enumerate(self.steps) if s.get('id') == 'builder')
-        self.assertLess(record, builder)
+        selection = next(i for i, s in enumerate(self.steps) if s.get('id') == 'selection')
+        self.assertLess(record, selection)
+        self.assertIn('python -m pip install . ', self.steps[selection - 1]['run'])
+        for name in ('nikgapps/project', 'builder-pin.json', 'release/.engine'):
+            self.assertNotIn(name, json.dumps(self.steps))
 
     def test_dependent_workflows_resolve_the_same_release_branch(self):
         for name in ('Android17ReleaseChecks', 'SyncGitHubRegistryMirror', 'SyncSourceForgeMetadata',
@@ -51,16 +61,19 @@ class Android17ReleaseTests(unittest.TestCase):
                 output = Path(temporary) / 'output'
                 subprocess.run([sys.executable, '-c', code], cwd=ROOT,
                     env={**os.environ, 'GITHUB_OUTPUT': str(output)}, check=True, capture_output=True)
-                self.assertEqual(f"ref={self.workflow['env']['RELEASE_REF']}", output.read_text().strip(), name)
+                self.assertEqual('ref=main', output.read_text().strip(), name)
 
     def test_myenv_bootstrap_precedes_git_and_publication(self):
-        self.assertEqual('${{ secrets.G_TOKEN }}', self.workflow['env']['G_TOKEN'])
+        self.assertEqual("${{ !inputs.verify_only && secrets.G_TOKEN || '' }}", self.workflow['env']['G_TOKEN'])
         serialized = json.dumps(self.workflow)
         for name in ('SSH_PRIVATE_KEY', 'SF_PWD', 'GITLAB_TOKEN'):
             self.assertNotIn('secrets.' + name, serialized)
         loader = next(i for i, step in enumerate(self.steps) if 'scripts/environment.py' in step.get('run', ''))
-        clones = next(i for i, step in enumerate(self.steps) if step.get('name') == 'Clone tested stable and overlay sources')
+        clones = next(i for i, step in enumerate(self.steps) if step.get('name') == 'Resolve Stable and overlay source revisions')
         self.assertLess(loader, clones)
+        self.assertEqual('${{ !inputs.verify_only }}', self.steps[loader]['if'])
+        self.assertEqual('${{ secrets.GITLAB_SOURCE_READ_TOKEN }}', self.steps[clones]['env']['GITLAB_SOURCE_READ_TOKEN'])
+        self.assertIn('export GITLAB_TOKEN="$GITLAB_SOURCE_READ_TOKEN"', self.steps[clones]['run'])
         self.assertEqual('false', next(s['with']['persist-credentials'] for s in self.steps if s.get('name') == 'Check out latest release engine'))
         self.assertNotIn('git@', serialized)
         self.assertNotIn('https://$', serialized)
@@ -88,17 +101,22 @@ class Android17ReleaseTests(unittest.TestCase):
         self.assertIn('--no-compare', verification['run'])
         self.assertIn('--verify-core', verification['run'])
         self.assertIn('--overlay-source .work/overlays_17_source', verification['run'])
+        for name in ('STABLE', 'OVERLAY_SOURCE', 'RELEASE'):
+            self.assertIn(f'"${name}_COMMIT"', verification['run'])
         self.assertNotIn('NikGapps.overlay_control', json.dumps(self.steps))
 
-    def test_overlay_source_commit_is_pinned_like_stable_source(self):
+    def test_both_source_commit_overrides_are_optional(self):
         inputs = self.workflow['on']['workflow_dispatch']['inputs']
-        self.assertRegex(inputs['overlay_source_commit']['default'], r'^[0-9a-f]{40}$')
         self.assertNotIn('overlays_commit', inputs)
-        step = next(s for s in self.steps if s.get('name') == 'Clone tested stable and overlay sources')
-        self.assertEqual('${{ inputs.overlay_source_commit }}', step['env']['TESTED_OVERLAY_SOURCE_COMMIT'])
-        self.assertIn('https://gitlab.com/nikgapps/overlays_17_source.git', step['run'])
-        self.assertIn('git -C .work/overlays_17_source fetch --depth=1 origin "$TESTED_OVERLAY_SOURCE_COMMIT"', step['run'])
-        self.assertIn('git -C .work/overlays_17_source checkout --detach FETCH_HEAD', step['run'])
+        step = next(s for s in self.steps if s.get('name') == 'Resolve Stable and overlay source revisions')
+        for key, repository in (('stable_commit', '17_stable'), ('overlay_source_commit', 'overlays_17_source')):
+            with self.subTest(source=repository):
+                self.assertEqual('false', inputs[key]['required'])
+                self.assertNotIn('default', inputs[key])
+                env_key = f'REQUESTED_{key.upper()}'
+                self.assertEqual('${{ inputs.' + key + ' }}', step['env'][env_key])
+                self.assertIn(f'https://gitlab.com/nikgapps/{repository}.git .work/{repository}', step['run'])
+                self.assertIn(f'{key.upper()} --commit "$' + env_key + '"', step['run'])
         self.assertNotIn('https://gitlab.com/nikgapps/overlays_17.git', step['run'])
 
     def test_inline_python_parses(self):

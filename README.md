@@ -24,20 +24,24 @@ does not upload packages, change metadata, log in to SourceForge or push files.
 
 The code and changelog are maintained in the private
 [`nikhilmenghani/nikgapps-release`](https://github.com/nikhilmenghani/nikgapps-release)
-repository. Edit its **`changelogs.yaml`**, commit and push to `main`. The workflow
-automatically checks out the latest `main` using `RELEASE_REF`; no release SHA
-update in deploy is needed. It records the resolved commit in the Actions summary
-and reads the builder pin directly from that checkout's `builder-pin.json`.
-Use the full tested/pushed `17_stable` SHA as `stable_commit` and the tested/pushed
-`overlays_17_source` SHA as `overlay_source_commit`. The source checkout is copied
+repository. Edit **`changelogs.yaml`** and develop engine changes on a branch.
+Merge reviewed changes into Release `main` when they are ready for use.
+
+Each run resolves Release `main`, `17_stable/main` and `overlays_17_source/main`
+once and shows their exact commits in the Actions summary. Leave **stable_commit**
+and **overlay_source_commit** blank to use the current source branches. Supply
+either full SHA to use that specific source revision. To release exactly the
+source revisions from a prior verification, use the two SHAs from its summary.
+A Deploy branch can run this workflow with **verify_only** enabled. Publication
+is available from Deploy `main`.
+
+The overlay source checkout is copied
 into the run workspace and compiled with the pinned official apktool (currently
 3.0.3); its download is SHA-256 verified. Pixel Launcher's framework and color
 APKs are built alongside every other overlay and included together in its payload.
 The release uses these new APKs directly, without a compiled-overlay repository
 or a separate Pixel Launcher build step. Source/tree/tool hashes and output APK
-hashes are retained in overlay reports, run state and the release receipt. The initial
-shared-Core SHA is `ae4bef228debce1be3f980b9bcbbcd3ab29e572b`; it includes the
-known-working WebView 134 set, not uncommitted local WebView 145 files.
+hashes are retained in overlay reports, run state and the release receipt.
 
 Only deploy's existing **`G_TOKEN`** secret is required. It checks out the private
 release code, reads `nikhilmenghani/myenv/.env` as data, and authenticates GitHub

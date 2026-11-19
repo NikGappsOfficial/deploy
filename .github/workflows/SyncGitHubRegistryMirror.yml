@@ -11,6 +11,7 @@ env:
   CATALOG_PROJECT: ${{ vars.GITLAB_CATALOG_PROJECT_ID || '85036487' }}
 jobs:
   mirror:
+    if: github.repository == 'NikGappsOfficial/deploy' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -38,24 +39,12 @@ jobs:
           token: ${{ secrets.G_TOKEN }}
           path: release
           persist-credentials: false
-      - name: Resolve pinned mirror builder
-        id: builder
+      - name: Install the resolved release engine
         run: |
-          python - <<'PY'
-          import json, os
-          from pathlib import Path
-          pin = json.loads(Path('release/builder-pin.json').read_text())
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write(f"commit={pin['commit']}\n")
-          PY
-      - uses: actions/checkout@v7
-        with:
-          repository: nikgapps/project
-          ref: ${{ steps.builder.outputs.commit }}
-          path: release/.engine
-          persist-credentials: false
+          echo "Release engine $(git -C release rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          python -m pip install ./release
       - name: Load publisher credentials from myenv
-        run: python release/scripts/environment.py
+        run: python scripts/environment.py
       - name: Mirror verified packages and publish metadata atomically
         working-directory: release
         run: python -m scripts.github_mirror

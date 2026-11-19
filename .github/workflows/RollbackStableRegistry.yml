@@ -27,6 +27,7 @@ concurrency:
 
 jobs:
   rollback:
+    if: github.repository == 'NikGappsOfficial/deploy' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -65,9 +66,9 @@ jobs:
 
       - name: Load GitLab access from myenv
         run: |
-          python release-engine/scripts/environment.py
-          chmod +x "$GITHUB_WORKSPACE/release-engine/scripts/git_askpass.py"
-          echo "GIT_ASKPASS=$GITHUB_WORKSPACE/release-engine/scripts/git_askpass.py" >> "$GITHUB_ENV"
+          python scripts/environment.py
+          chmod +x "$GITHUB_WORKSPACE/scripts/git_askpass.py"
+          echo "GIT_ASKPASS=$GITHUB_WORKSPACE/scripts/git_askpass.py" >> "$GITHUB_ENV"
 
       - name: Clone catalog
         run: |
@@ -75,24 +76,11 @@ jobs:
           git -C catalog config user.name 'NikGapps Registry Rollback'
           git -C catalog config user.email 'actions@users.noreply.github.com'
 
-      - name: Resolve mirror implementation after an applied rollback
+      - name: Install the resolved release engine for an applied rollback
         if: inputs.apply
-        id: mirror-builder
         run: |
-          python - <<'PY'
-          import json, os
-          from pathlib import Path
-          pin = json.loads(Path('release-engine/builder-pin.json').read_text())
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write(f"commit={pin['commit']}\n")
-          PY
-      - uses: actions/checkout@v7
-        if: inputs.apply
-        with:
-          repository: nikgapps/project
-          ref: ${{ steps.mirror-builder.outputs.commit }}
-          path: release-engine/.engine
-          persist-credentials: false
+          echo "Release engine $(git -C release-engine rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          python -m pip install ./release-engine
       - name: Verify GitHub mirror access before applying rollback
         if: inputs.apply
         working-directory: release-engine

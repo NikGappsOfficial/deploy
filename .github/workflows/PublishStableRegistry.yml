@@ -25,6 +25,7 @@ concurrency:
 
 jobs:
   publish:
+    if: github.repository == 'NikGappsOfficial/deploy' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 360
     env:
@@ -61,7 +62,7 @@ jobs:
           path: release-engine
           persist-credentials: false
       - name: Load stable publication credentials from myenv
-        run: python release-engine/scripts/environment.py
+        run: python scripts/environment.py
       - name: Validate target and credentials
         shell: bash
         run: |
@@ -73,22 +74,24 @@ jobs:
           test -n "$PACKAGES_GITHUB_TOKEN"
       - name: Configure HTTPS repository access and LFS
         run: |
-          chmod +x "$GITHUB_WORKSPACE/release-engine/scripts/git_askpass.py"
-          echo "GIT_ASKPASS=$GITHUB_WORKSPACE/release-engine/scripts/git_askpass.py" >> "$GITHUB_ENV"
+          chmod +x "$GITHUB_WORKSPACE/scripts/git_askpass.py"
+          echo "GIT_ASKPASS=$GITHUB_WORKSPACE/scripts/git_askpass.py" >> "$GITHUB_ENV"
           git lfs install
-      - name: Clone project and stable sources
+      - name: Clone stable and overlay inputs and record their revisions
         run: |
-          git clone --depth=1 https://github.com/nikgapps/project.git project
           git clone --depth=1 "https://gitlab.com/nikgapps/${ANDROID_VERSION}_stable.git" "${ANDROID_VERSION}_stable"
           git clone --depth=1 "https://gitlab.com/nikgapps/overlays_${ANDROID_VERSION}.git" "overlays_${ANDROID_VERSION}"
+          echo "Stable source $(git -C "${ANDROID_VERSION}_stable" rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Compiled overlays $(git -C "overlays_${ANDROID_VERSION}" rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Install publisher dependencies
+      - name: Install and verify the resolved release engine
         shell: bash
         run: |
-          python -m pip install -r project/requirements.txt 'nikassets~=0.17'
-          python -m pip install --no-deps -e ./project
+          echo "Release engine $(git -C release-engine rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          python -m pip install ./release-engine
+          nikgapps-release-registry sync --help
 
-      - name: Locate build assets
+      - name: Locate Android build tools
         id: assets
         shell: bash
         run: |
@@ -97,26 +100,20 @@ jobs:
             echo "Android SDK build-tools/aapt2 is unavailable" >&2
             exit 1
           fi
-          BUSYBOX="$(python -c 'from importlib.resources import files; print(files("nikassets").joinpath("helper/assets/busybox"))')"
-          if [[ ! -f "$BUSYBOX" ]]; then
-            echo "nikassets busybox is unavailable" >&2
-            exit 1
-          fi
           echo "aapt2=$AAPT2" >> "$GITHUB_OUTPUT"
-          echo "busybox=$BUSYBOX" >> "$GITHUB_OUTPUT"
 
       - name: Verify Android configuration
-        run: python -m unittest discover -s tests_registry -v
-        working-directory: project
+        run: python -m unittest discover -s tests -v
+        working-directory: release-engine
 
       - name: Verify GitHub mirror access before canonical publication
         working-directory: release-engine
-        run: python -m scripts.github_mirror --builder ../project --check-access
+        run: python -m scripts.github_mirror --check-access
 
       - name: Publish stable packages and automatic config revisions
         shell: bash
         run: |
-          python -m nikgapps_registry sync \
+          nikgapps-release-registry sync --publish \
             --source "${ANDROID_VERSION}_stable" \
             --overlays "overlays_${ANDROID_VERSION}" \
             --work "${ANDROID_VERSION}_REGISTRY_RELEASE" \
@@ -124,14 +121,11 @@ jobs:
             --android-version "$ANDROID_VERSION" \
             --arch arm64-v8a \
             --channel stable \
-            --aapt2 "${{ steps.assets.outputs.aapt2 }}" \
-            --busybox "${{ steps.assets.outputs.busybox }}" \
-            --builder-assets project/NikGapps/helper/assets \
-            --verbose
+            --aapt2 "${{ steps.assets.outputs.aapt2 }}"
 
       - name: Mirror stable packages and metadata to GitHub
         working-directory: release-engine
-        run: python -m scripts.github_mirror --builder ../project
+        run: python -m scripts.github_mirror
 
       - name: Upload publication manifest
         if: always()
