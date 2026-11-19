@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
-      REVIEW_ROOT: ${{ runner.temp }}/stable-build-verification
+      REVIEW_ROOT: ${{ github.workspace }}/stable-build-verification
       GIT_TERMINAL_PROMPT: '0'
       PYTHONUNBUFFERED: '1'
     steps:
@@ -132,6 +132,7 @@ jobs:
                   if overlays:
                       apktool = overlays["apktool"]
                       summary.write(f"- Compiled {len(overlays['files'])} overlays with apktool {apktool['version']}\n")
+                      summary.write(f"- apktool SHA-256 `{apktool['sha256']}`\n")
                       for item in overlays["files"]:
                           if item["path"].startswith("PixelLauncherOverlay/"):
                               summary.write(f"- {Path(item['path']).name} SHA-256 `{item['sha256']}`\n")
