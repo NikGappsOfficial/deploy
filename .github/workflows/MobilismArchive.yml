@@ -8,7 +8,7 @@ on:
       mode:
         description: Check access or download and publish newer releases
         type: choice
-        options: [preflight, archive]
+        options: [preflight, archive, diagnostics]
         default: preflight
 
 permissions:
@@ -63,10 +63,15 @@ jobs:
               print('::add-mask::' + escaped)
           PY
           python -m unittest test_mobilism_to_telegram test_mobilism_apk test_mobilism_github_state test_mobilism_config -q
+      - name: Diagnose Mobilism HTTP access without publishing
+        if: inputs.mode == 'diagnostics'
+        run: python mobilism_diagnostics.py
       - name: Restore encrypted history and acquire archive lease
         id: state
+        if: inputs.mode != 'diagnostics'
         run: python mobilism_github_state.py begin
       - name: Check Telegram access
+        if: inputs.mode != 'diagnostics'
         run: python mobilism_to_telegram.py preflight
       - name: Archive new releases
         if: github.event_name == 'schedule' || inputs.mode == 'archive'
