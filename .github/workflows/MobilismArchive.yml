@@ -23,21 +23,11 @@ jobs:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.MOBILISM_ARCHIVE_ENABLED == 'true')
     runs-on: ubuntu-24.04
     timeout-minutes: 330
-    permissions:
-      contents: write
     defaults:
       run:
         working-directory: cron
     env:
       PYTHONUNBUFFERED: '1'
-      MOBILISM_USERNAME: ${{ secrets.MOBILISM_USERNAME }}
-      MOBILISM_PASSWORD: ${{ secrets.MOBILISM_PASSWORD }}
-      MOBILISM_PREMIUM_PASSWORD: ${{ secrets.MOBILISM_PREMIUM_PASSWORD }}
-      MOBILISM_TELEGRAM_BOT_TOKEN: ${{ secrets.MOBILISM_TELEGRAM_BOT_TOKEN }}
-      MOBILISM_TELEGRAM_API_ID: ${{ secrets.MOBILISM_TELEGRAM_API_ID }}
-      MOBILISM_TELEGRAM_API_HASH: ${{ secrets.MOBILISM_TELEGRAM_API_HASH }}
-      MOBILISM_TELEGRAM_CHAT_ID: ${{ secrets.MOBILISM_TELEGRAM_CHAT_ID }}
-      MOBILISM_STATE_KEY: ${{ secrets.MOBILISM_STATE_KEY }}
     steps:
       - name: Checkout deploy
         uses: actions/checkout@v7
@@ -60,22 +50,18 @@ jobs:
           python -m pip install -r requirements-mobilism.txt
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends aapt
-      - name: Test archive and validate required secrets
+      - name: Test archive and validate private cron configuration
         run: |
-          python -m unittest test_mobilism_to_telegram test_mobilism_apk test_mobilism_github_state -q
+          python -m unittest test_mobilism_to_telegram test_mobilism_apk test_mobilism_github_state test_mobilism_config -q
           python - <<'PY'
-          import os
-          names = ('MOBILISM_USERNAME', 'MOBILISM_PASSWORD', 'MOBILISM_PREMIUM_PASSWORD',
-                   'MOBILISM_TELEGRAM_BOT_TOKEN', 'MOBILISM_TELEGRAM_API_ID',
-                   'MOBILISM_TELEGRAM_API_HASH', 'MOBILISM_TELEGRAM_CHAT_ID', 'MOBILISM_STATE_KEY')
-          missing = [name for name in names if not os.environ.get(name)]
+          from mobilism_config import CREDENTIAL_NAMES, credential, load_credentials
+          private = load_credentials()
+          missing = sorted(name for name in CREDENTIAL_NAMES if not credential(name, private))
           if missing:
-              raise SystemExit('Configure repository Actions secrets: ' + ', '.join(missing))
+              raise SystemExit('Configure the private cron credential file: ' + ', '.join(missing))
           PY
       - name: Restore encrypted history and acquire archive lease
         id: state
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         run: python mobilism_github_state.py begin
       - name: Check Telegram access
         run: python mobilism_to_telegram.py preflight
@@ -84,6 +70,4 @@ jobs:
         run: python mobilism_to_telegram.py --source forum run
       - name: Save encrypted history even if archiving failed
         if: always() && steps.state.outcome == 'success'
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         run: python mobilism_github_state.py finish
