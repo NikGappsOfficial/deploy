@@ -52,14 +52,17 @@ jobs:
           sudo apt-get install -y --no-install-recommends aapt
       - name: Test archive and validate private cron configuration
         run: |
-          python -m unittest test_mobilism_to_telegram test_mobilism_apk test_mobilism_github_state test_mobilism_config -q
           python - <<'PY'
           from mobilism_config import CREDENTIAL_NAMES, credential, load_credentials
           private = load_credentials()
           missing = sorted(name for name in CREDENTIAL_NAMES if not credential(name, private))
           if missing:
               raise SystemExit('Configure the private cron credential file: ' + ', '.join(missing))
+          for value in private.values():
+              escaped = value.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print('::add-mask::' + escaped)
           PY
+          python -m unittest test_mobilism_to_telegram test_mobilism_apk test_mobilism_github_state test_mobilism_config -q
       - name: Restore encrypted history and acquire archive lease
         id: state
         run: python mobilism_github_state.py begin
