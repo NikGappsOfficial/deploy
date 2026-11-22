@@ -1,0 +1,89 @@
+name: Mobilism archive
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Check access or download and publish newer releases
+        type: choice
+        options: [preflight, archive]
+        default: preflight
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobilism-archive
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.MOBILISM_ARCHIVE_ENABLED == 'true')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: cron
+    env:
+      PYTHONUNBUFFERED: '1'
+      MOBILISM_USERNAME: ${{ secrets.MOBILISM_USERNAME }}
+      MOBILISM_PASSWORD: ${{ secrets.MOBILISM_PASSWORD }}
+      MOBILISM_PREMIUM_PASSWORD: ${{ secrets.MOBILISM_PREMIUM_PASSWORD }}
+      MOBILISM_TELEGRAM_BOT_TOKEN: ${{ secrets.MOBILISM_TELEGRAM_BOT_TOKEN }}
+      MOBILISM_TELEGRAM_API_ID: ${{ secrets.MOBILISM_TELEGRAM_API_ID }}
+      MOBILISM_TELEGRAM_API_HASH: ${{ secrets.MOBILISM_TELEGRAM_API_HASH }}
+      MOBILISM_TELEGRAM_CHAT_ID: ${{ secrets.MOBILISM_TELEGRAM_CHAT_ID }}
+      MOBILISM_STATE_KEY: ${{ secrets.MOBILISM_STATE_KEY }}
+    steps:
+      - name: Checkout deploy
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Use existing private-source SSH access
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Fetch cron source
+        working-directory: .
+        run: git clone --depth=1 git@github.com:nikhilmenghani/cron.git cron
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: cron/requirements-mobilism.txt
+      - name: Install archive dependencies and APK inspector
+        run: |
+          python -m pip install -r requirements-mobilism.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends aapt
+      - name: Test archive and validate required secrets
+        run: |
+          python -m unittest test_mobilism_to_telegram test_mobilism_apk test_mobilism_github_state -q
+          python - <<'PY'
+          import os
+          names = ('MOBILISM_USERNAME', 'MOBILISM_PASSWORD', 'MOBILISM_PREMIUM_PASSWORD',
+                   'MOBILISM_TELEGRAM_BOT_TOKEN', 'MOBILISM_TELEGRAM_API_ID',
+                   'MOBILISM_TELEGRAM_API_HASH', 'MOBILISM_TELEGRAM_CHAT_ID', 'MOBILISM_STATE_KEY')
+          missing = [name for name in names if not os.environ.get(name)]
+          if missing:
+              raise SystemExit('Configure repository Actions secrets: ' + ', '.join(missing))
+          PY
+      - name: Restore encrypted history and acquire archive lease
+        id: state
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python mobilism_github_state.py begin
+      - name: Check Telegram access
+        run: python mobilism_to_telegram.py preflight
+      - name: Archive new releases
+        if: github.event_name == 'schedule' || inputs.mode == 'archive'
+        run: python mobilism_to_telegram.py --source forum run
+      - name: Save encrypted history even if archiving failed
+        if: always() && steps.state.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python mobilism_github_state.py finish
