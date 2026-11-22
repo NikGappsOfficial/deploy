@@ -73,6 +73,11 @@ jobs:
       - name: Diagnose Mobilism HTTP access without publishing
         if: inputs.mode == 'diagnostics'
         run: python mobilism_diagnostics.py
+      - name: Check normal Chrome JavaScript verification
+        if: inputs.mode == 'diagnostics' && runner.os == 'Linux'
+        run: |
+          python -m pip install playwright
+          xvfb-run -a python mobilism_browser_probe.py
       - name: Restore encrypted history and acquire archive lease
         id: state
         if: inputs.mode != 'diagnostics'
