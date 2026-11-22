@@ -25,6 +25,21 @@ The schedule runs hourly at minute 17 UTC when deploy's repository variable
 cancel an upload in progress. Disable that variable to stop scheduled publishing.
 GitHub can delay scheduled jobs; the schedule is not a real-time guarantee.
 
+## Provider access diagnostics
+
+Select `diagnostics` and a standard hosted runner to inspect provider access
+without sending files or changing delivery history. Tests compare HTTP clients
+and normal Chrome navigation on Linux x64. Logs contain only response metadata;
+credentials, cookies and page contents are omitted. Diagnostic runs have their
+own concurrency groups; archive runs remain serialized.
+
+Telegram preflight checks the destination, not the provider's network rules.
+The 2026-11-22 comparisons found that all four tested hosted pools were refused
+by Mobilism's forum and app API, even where Premium authentication succeeded.
+Normal Chrome did not complete the forum challenge. A successful diagnostic job
+means its probes completed, not that every probe received HTTP 200. Source
+access must succeed before hourly archiving can publish new releases.
+
 ## Persisted history and recovery
 
 Delivery history and the Telegram session are AES-256-GCM encrypted before being
