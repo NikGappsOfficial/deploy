@@ -13,14 +13,14 @@ on:
       runner:
         description: Runner for HTTP access diagnostics
         type: choice
-        options: [ubuntu-24.04, macos-15]
+        options: [ubuntu-24.04, ubuntu-24.04-arm, windows-2025, macos-15]
         default: ubuntu-24.04
 
 permissions:
   contents: read
 
 concurrency:
-  group: mobilism-archive
+  group: ${{ inputs.mode == 'diagnostics' && format('mobilism-diagnostics-{0}', github.run_id) || 'mobilism-archive' }}
   cancel-in-progress: false
 
 jobs:
@@ -31,6 +31,7 @@ jobs:
     defaults:
       run:
         working-directory: cron
+        shell: bash
     env:
       PYTHONUNBUFFERED: '1'
     steps:
@@ -74,7 +75,8 @@ jobs:
         if: inputs.mode == 'diagnostics'
         run: python mobilism_diagnostics.py
       - name: Check normal Chrome JavaScript verification
-        if: inputs.mode == 'diagnostics' && runner.os == 'Linux'
+        if: inputs.mode == 'diagnostics' && runner.os == 'Linux' && runner.arch == 'X64'
+        timeout-minutes: 4
         run: |
           python -m pip install playwright
           xvfb-run -a python mobilism_browser_probe.py
